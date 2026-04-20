@@ -1,7 +1,7 @@
 import { User, Workout } from './types';
 
 export const mockUsers: User[] = [
-  { id: 'c1', name: 'Treinador Dexter', role: 'coach', points: 0, tier: '' },
+  { id: 'coach_daniel', name: 'Daniel', role: 'coach', points: 0, tier: 'Treinador Alfa' },
 ];
 
 export const mockWorkouts: Workout[] = [
@@ -60,10 +60,19 @@ export const mockWorkouts: Workout[] = [
 ];
 
 export const gymJokes = [
-  "Se fosse fácil, se chamaria pudim.",
-  "Treino ruim é aquele que não aconteceu.",
-  "O peso não fica mais leve, você que fica mais forte.",
-  "Vai um docinho? Só se for de batata doce.",
-  "Agacha que cresce!",
-  "Sua desculpa não queima calorias."
+  "O veneno está sendo inoculado.",
+  "Predadores não pulam o leg day.",
+  "A dor é o aviso de que a presa está cedendo.",
+  "Sua fraqueza é o alimento da Atheris.",
+  "Bote preciso, execução letal.",
+  "Sinta as escamas arderem.",
+  "Hierarquia se constrói com ferro e sangue."
+];
+
+export const predatorQuotes = [
+  "Silencioso, preciso, letal.",
+  "Quanto mais tóxico o ambiente, mais forte o predador.",
+  "Seu cansaço é irrelevante para a sua evolução.",
+  "O topo da cadeia alimentar não aceita desculpas.",
+  "Domine a carga ou seja devorado por ela."
 ];

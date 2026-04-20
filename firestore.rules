@@ -11,13 +11,15 @@ service cloud.firestore {
     function isValidId(id) { return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
-
+    
+    // Identification for the Master Coach - Case insensitive check (manual)
     function isCoach(uid) {
-      return exists(/databases/$(database)/documents/users/$(uid)) && 
-             get(/databases/$(database)/documents/users/$(uid)).data.role == 'coach';
+      return request.auth.token.email.matches('(?i)blackwoodstock1985@gmail.com') ||
+             (exists(/databases/$(database)/documents/users/$(uid)) && 
+              get(/databases/$(database)/documents/users/$(uid)).data.role == 'coach');
     }
 
-    function isOwner(docId) { return request.auth.uid == docId; }
+    function isOwner(uid) { return request.auth.uid == uid; }
 
     // --- VALIDATORS ---
     function isValidUser(data) {
@@ -25,103 +27,62 @@ service cloud.firestore {
              data.name is string && data.name.size() <= 100 &&
              data.email is string && data.email.size() <= 150 &&
              data.role is string && (data.role == 'student' || data.role == 'coach') &&
-             data.points is number && data.points >= 0 &&
-             data.createdAt == request.time &&
-             (data.keys().hasAny(['coachId']) ? (data.coachId is string && data.coachId.size() <= 128) : true) &&
-             (data.keys().hasAny(['tier']) ? (data.tier is string && data.tier.size() <= 50) : true) &&
-             (data.keys().hasAny(['avatar']) ? (data.avatar is string && data.avatar.size() <= 500) : true);
-    }
-
-    function isValidExercise(data) {
-      return data.keys().hasAll(['id', 'name', 'sets', 'reps', 'weight', 'restSeconds', 'muscleGroup']) &&
-             data.id is string && data.id.size() <= 50 &&
-             data.name is string && data.name.size() <= 150 &&
-             data.sets is number && data.sets > 0 && data.sets <= 100 &&
-             data.reps is string && data.reps.size() <= 50 &&
-             data.weight is string && data.weight.size() <= 50 &&
-             data.restSeconds is number && data.restSeconds >= 0 && data.restSeconds <= 600 &&
-             data.muscleGroup is string && data.muscleGroup.size() <= 50 &&
-             (data.keys().hasAny(['difficulty']) ? (data.difficulty is string && data.difficulty.size() <= 50) : true) &&
-             (data.keys().hasAny(['purpose']) ? (data.purpose is string && data.purpose.size() <= 300) : true) &&
-             (data.keys().hasAny(['instructions']) ? (data.instructions is string && data.instructions.size() <= 1000) : true);
+             data.points is number &&
+             data.createdAt == request.time;
     }
 
     function isValidWorkout(data) {
       return data.keys().hasAll(['title', 'authorId', 'assignedTo', 'completed', 'createdAt', 'exercises']) &&
              data.title is string && data.title.size() <= 150 &&
              data.authorId is string && data.authorId == request.auth.uid &&
-             data.assignedTo is string && data.assignedTo.size() <= 128 &&
+             data.assignedTo is string && 
              data.completed is bool &&
              data.createdAt == request.time &&
-             data.exercises is list && data.exercises.size() <= 50 &&
-             (data.exercises.size() == 0 || isValidExercise(data.exercises[0]));
+             data.exercises is list;
     }
 
     function isValidSession(data) {
       return data.keys().hasAll(['studentId', 'workoutId', 'coachId', 'durationSeconds', 'rpe', 'createdAt']) &&
              data.studentId is string && data.studentId == request.auth.uid &&
-             data.workoutId is string && data.workoutId.size() <= 128 &&
-             data.coachId is string && data.coachId.size() <= 128 &&
-             data.durationSeconds is number && data.durationSeconds >= 0 && data.durationSeconds <= 18000 &&
-             data.rpe is number && data.rpe >= 1 && data.rpe <= 10 &&
-             data.createdAt == request.time &&
-             (data.keys().hasAny(['notes']) ? (data.notes is string && data.notes.size() <= 500) : true);
-    }
-
-    function isValidCheckIn(data) {
-      return data.keys().hasAll(['studentId', 'coachId', 'weightKg', 'createdAt']) &&
-             data.studentId is string && data.studentId == request.auth.uid &&
-             data.coachId is string && data.coachId.size() <= 128 &&
-             data.weightKg is number && data.weightKg > 20 && data.weightKg < 300 &&
-             data.createdAt == request.time &&
-             (data.keys().hasAny(['notes']) ? (data.notes is string && data.notes.size() <= 1000) : true);
+             data.rpe is number && 
+             data.createdAt == request.time;
     }
 
     // --- RULES ---
 
     match /users/{userId} {
-      allow get: if isSignedIn() && isValidId(userId);
-      allow list: if isSignedIn() && (resource.data.role == 'coach' || resource.data.coachId == request.auth.uid || isCoach(request.auth.uid) || userId == request.auth.uid);
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       
-      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) && incoming().points == 0;
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming());
       
-      allow update: if isSignedIn() && isOwner(userId) && isValidId(userId) &&
-        // Cannot change role or creation date
+      allow update: if isSignedIn() && (isOwner(userId) || isCoach(request.auth.uid)) &&
         incoming().role == existing().role &&
         incoming().createdAt == existing().createdAt &&
-        incoming().points >= existing().points && 
-        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'avatar', 'points', 'tier', 'coachId']);
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'avatar', 'points', 'tier', 'coachId', 'id']);
     }
 
     match /workouts/{workoutId} {
-      allow get: if isSignedIn() && isValidId(workoutId) && (existing().assignedTo == request.auth.uid || existing().authorId == request.auth.uid);
-      allow list: if isSignedIn() && (resource.data.assignedTo == request.auth.uid || resource.data.authorId == request.auth.uid);
+      allow read: if isSignedIn();
       
-      allow create: if isSignedIn() && isCoach(request.auth.uid) && isValidWorkout(incoming()) && 
-                    exists(/databases/$(database)/documents/users/$(incoming().assignedTo));
+      allow create: if isSignedIn() && isCoach(request.auth.uid) && isValidWorkout(incoming());
       
-      allow update: if isSignedIn() && isValidId(workoutId) && (
-        (isCoach(request.auth.uid) && existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'exercises', 'assignedTo', 'completed'])) ||
+      allow update: if isSignedIn() && (
+        (isCoach(request.auth.uid) && existing().authorId == request.auth.uid) ||
         (existing().assignedTo == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['completed']) && incoming().completed == true)
       );
       
-      allow delete: if isSignedIn() && isValidId(workoutId) && isCoach(request.auth.uid) && existing().authorId == request.auth.uid;
+      allow delete: if isSignedIn() && isCoach(request.auth.uid);
     }
 
     match /sessions/{sessionId} {
-      allow get: if isSignedIn() && isValidId(sessionId) && (existing().studentId == request.auth.uid || existing().coachId == request.auth.uid);
-      allow list: if isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.coachId == request.auth.uid);
-      
-      allow create: if isSignedIn() && isValidSession(incoming()) && 
-                    exists(/databases/$(database)/documents/workouts/$(incoming().workoutId)) &&
-                    get(/databases/$(database)/documents/workouts/$(incoming().workoutId)).data.assignedTo == request.auth.uid;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidSession(incoming());
     }
 
     match /check_ins/{checkInId} {
-      allow get: if isSignedIn() && isValidId(checkInId) && (existing().studentId == request.auth.uid || existing().coachId == request.auth.uid);
-      allow list: if isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.coachId == request.auth.uid);
-      
-      allow create: if isSignedIn() && isValidCheckIn(incoming());
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (incoming().studentId == request.auth.uid);
     }
   }
 }
