@@ -1,0 +1,101 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile in the application.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "coach"] },
+        "points": { "type": "number" },
+        "tier": { "type": "string" },
+        "avatar": { "type": "string" },
+        "coachId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["name", "email", "role", "points", "createdAt"]
+    },
+    "Exercise": {
+      "title": "Exercise",
+      "description": "An exercise within a workout.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "sets": { "type": "number" },
+        "reps": { "type": "string" },
+        "weight": { "type": "string" },
+        "restSeconds": { "type": "number" },
+        "muscleGroup": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "purpose": { "type": "string" },
+        "instructions": { "type": "string" }
+      },
+      "required": ["id", "name", "sets", "reps", "weight", "restSeconds", "muscleGroup"]
+    },
+    "Workout": {
+      "title": "Workout",
+      "description": "A customized workout assigned to a student.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "authorId": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "timestamp" },
+        "exercises": { 
+          "type": "array",
+          "items": { "$ref": "#/entities/Exercise" }
+        }
+      },
+      "required": ["title", "authorId", "assignedTo", "completed", "createdAt", "exercises"]
+    },
+    "Session": {
+      "title": "Workout Session",
+      "description": "A completed log of a workout.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "workoutId": { "type": "string" },
+        "coachId": { "type": "string" },
+        "durationSeconds": { "type": "number" },
+        "rpe": { "type": "number", "description": "Rating of perceived exertion 1-10" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["studentId", "workoutId", "durationSeconds", "rpe", "createdAt", "coachId"]
+    },
+    "CheckIn": {
+      "title": "Check In",
+      "description": "Weekly tracking for a student.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "coachId": { "type": "string" },
+        "weightKg": { "type": "number" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["studentId", "weightKg", "createdAt", "coachId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Profiles for students and coaches."
+    },
+    "/workouts/{workoutId}": {
+      "schema": { "$ref": "#/entities/Workout" },
+      "description": "Workouts assigned by coaches to students."
+    },
+    "/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/Session" },
+      "description": "Logs of completed workouts."
+    },
+    "/check_ins/{checkInId}": {
+      "schema": { "$ref": "#/entities/CheckIn" },
+      "description": "Weekly check-in logs with bodyweight and measures."
+    }
+  }
+}
