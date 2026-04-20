@@ -6,7 +6,7 @@ import { mockUsers, mockWorkouts, gymJokes } from './mockData';
 
 import { signInWithGoogle, logout, db, auth, handleFirestoreError, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, addDoc, updateDoc } from 'firebase/firestore';
 
 // --- STYLING HELPERS ---
 const classNames = (...classes: (string | undefined | null | false)[]) => classes.filter(Boolean).join(' ');
@@ -370,56 +370,116 @@ const HomeView: React.FC<{ user: User, completedWorkouts: number, weeklyComplete
   </motion.div>
 );
 
-const TreinosView: React.FC<{ onExecute: (w: Workout) => void }> = ({ onExecute }) => {
-  const workouts = mockWorkouts;
+const TreinosView = ({ currentUser, onExecute }: { currentUser: User, onExecute: (w: Workout) => void }) => {
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchW = async () => {
+      try {
+        const q = query(collection(db, 'workouts'), where('assignedTo', '==', currentUser.id), where('completed', '==', false));
+        const snap = await getDocs(q);
+        const wks = snap.docs.map(d => ({ id: d.id, ...d.data() } as Workout));
+        setWorkouts(wks);
+      } catch(e) { console.error(e); }
+      finally { setLoading(false); }
+    };
+    fetchW();
+  }, [currentUser.id]);
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-6">
        <h2 className="text-2xl font-bold mb-6">Seus Treinos</h2>
        <div className="flex flex-col gap-4">
-         {workouts.map(w => (
-           <button onClick={() => onExecute(w)} key={w.id} className="glass p-5 rounded-2xl flex items-center justify-between hover:border-pastel-accent/50 transition-colors text-left group shadow-lg">
-             <div>
-               <h3 className="font-bold text-lg text-white group-hover:text-pastel-accent transition-colors">{w.title}</h3>
-               <p className="mono opacity-60 uppercase mt-1">{w.exercises.length} Exercícios</p>
-             </div>
-             <Play className="text-pastel-accent opacity-50 group-hover:opacity-100 transition-opacity" />
-           </button>
-         ))}
+         {loading ? <p className="text-center opacity-50 py-10">Buscando treinos...</p> : 
+          workouts.length === 0 ? (
+            <div className="text-center py-10 opacity-50 bg-white/5 rounded-2xl">
+              <Dumbbell className="mx-auto block mb-2 opacity-50" size={32}/>
+              <p>Nenhum treino pendente.</p>
+            </div>
+          ) : (
+            workouts.map(w => (
+              <button onClick={() => onExecute(w)} key={w.id} className="glass p-5 rounded-2xl flex items-center justify-between hover:border-pastel-accent/50 transition-colors text-left group shadow-lg">
+                <div>
+                  <h3 className="font-bold text-lg text-white group-hover:text-pastel-accent transition-colors">{w.title}</h3>
+                  <p className="mono opacity-60 uppercase mt-1">{w.exercises.length} Exercícios</p>
+                </div>
+                <Play className="text-pastel-accent opacity-50 group-hover:opacity-100 transition-opacity" />
+              </button>
+            ))
+          )
+         }
        </div>
     </motion.div>
   );
 };
 
 const RankView: React.FC = () => {
-  const ranked = [...mockUsers].filter(u => u.role === 'student').sort((a,b) => b.points - a.points);
+  const [ranked, setRanked] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const medals = ['text-yellow-400', 'text-gray-300', 'text-amber-600'];
+
+  useEffect(() => {
+    const fetchRank = async () => {
+      try {
+        const q = query(collection(db, 'users'), where('role', '==', 'student'));
+        const snap = await getDocs(q);
+        const users = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        users.sort((a,b) => (b.points || 0) - (a.points || 0));
+        setRanked(users);
+      } catch(e) { console.error(e); }
+      finally { setLoading(false); }
+    }
+    fetchRank();
+  }, []);
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-6">
       <h2 className="text-2xl font-bold mb-6">Leaderboard</h2>
       <div className="flex flex-col gap-3">
-        {ranked.map((u, i) => (
-           <div key={u.id} className="glass p-4 rounded-2xl flex items-center gap-4 shadow-lg">
-             <div className={classNames("w-8 h-8 rounded-full flex items-center justify-center font-bold font-mono", i < 3 ? 'bg-white/10' : 'bg-transparent text-pastel-muted')}>
-               {i < 3 ? <Trophy size={16} className={medals[i]} /> : i + 1}
-             </div>
-             <div className="flex-1">
-               <h3 className="font-bold text-white text-lg">{u.name}</h3>
-               {u.tier && <span className="mono opacity-60 uppercase">{u.tier}</span>}
-             </div>
-             <div className="text-right">
-               <span className="font-mono text-xl text-white">{u.points}</span>
-               <span className="mono accent-text ml-1 uppercase">pts</span>
-             </div>
-           </div>
-        ))}
+         {loading ? <p className="opacity-50 text-center py-10">Carregando rank...</p> : 
+            ranked.map((u, i) => (
+            <div key={u.id} className="glass p-4 rounded-2xl flex items-center gap-4 shadow-lg">
+              <div className={classNames("w-8 h-8 rounded-full flex items-center justify-center font-bold font-mono", i < 3 ? 'bg-white/10' : 'bg-transparent text-pastel-muted')}>
+                {i < 3 ? <Trophy size={16} className={medals[i]} /> : i + 1}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-white text-lg">{u.name}</h3>
+                {u.tier && <span className="mono opacity-60 uppercase">{u.tier}</span>}
+              </div>
+              <div className="text-right">
+                <span className="font-mono text-xl text-white">{u.points || 0}</span>
+                <span className="mono accent-text ml-1 uppercase">pts</span>
+              </div>
+            </div>
+         ))}
       </div>
     </motion.div>
   )
 };
 
-const AlunosView: React.FC = () => {
-  const students = mockUsers.filter(u => u.role === 'student');
+const AlunosView = ({ currentUser }: { currentUser: User }) => {
+  const [students, setStudents] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const q = query(
+          collection(db, 'users'),
+          where('role', '==', 'student')
+        );
+        const querySnapshot = await getDocs(q);
+        const st = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        setStudents(st);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStudents();
+  }, []);
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-6">
@@ -429,15 +489,24 @@ const AlunosView: React.FC = () => {
       </div>
 
       <div className="flex flex-col gap-3">
-        {students.map(s => (
-          <div key={s.id} className="glass p-4 rounded-2xl flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors shadow-lg">
-            <div>
-              <h3 className="font-bold text-white text-lg">{s.name}</h3>
-              <p className="mono opacity-60 uppercase mt-1">{s.points} PTS • {s.tier}</p>
+        {loading ? (
+             <p className="opacity-50 text-center py-10">Carregando alunos...</p>
+        ) : students.length === 0 ? (
+             <div className="text-center py-10 opacity-50 bg-white/5 rounded-2xl">
+                 <p>Nenhum aluno encontrado.</p>
+                 <p className="text-xs mt-2 text-pastel-accent">Novos alunos aparecerão aqui ao se cadastrarem.</p>
+             </div>
+        ) : (
+          students.map(s => (
+            <div key={s.id} className="glass p-4 rounded-2xl flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors shadow-lg">
+              <div>
+                <h3 className="font-bold text-white text-lg">{s.name}</h3>
+                <p className="mono opacity-60 uppercase mt-1">{s.points || 0} PTS • {s.tier || 'Iniciante'}</p>
+              </div>
+              <ChevronLeft size={20} className="transform rotate-180 text-pastel-muted" />
             </div>
-            <ChevronLeft size={20} className="transform rotate-180 text-pastel-muted" />
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </motion.div>
   )
@@ -525,13 +594,64 @@ const ExerciseInfoModal = ({ ex, onClose }: { ex: Exercise, onClose: () => void 
   )
 };
 
-const ExecuteWorkoutModal = ({ workout, onClose }: { workout: Workout, onClose: () => void }) => {
+const ExecuteWorkoutModal = ({ workout, currentUser, onClose }: { workout: Workout, currentUser: User, onClose: () => void }) => {
   const [activeRestState, setActiveRestState] = useState<{secs: number, id: number} | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  
+  // Execution tracking
+  const [startTime] = useState<number>(Date.now());
+  const [finishing, setFinishing] = useState(false);
+  const [rpe, setRpe] = useState<number>(7);
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const startRest = (secs: number) => {
     setActiveRestState({ secs, id: Date.now() });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleFinish = async () => {
+    if (!finishing) {
+        setFinishing(true);
+        return;
+    }
+    
+    // Save to Firebase
+    setSaving(true);
+    try {
+        const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
+        const newPoints = currentUser.points + 100;
+        
+        // 1. Save Session
+        await addDoc(collection(db, 'sessions'), {
+            studentId: currentUser.id,
+            coachId: currentUser.coachId,
+            workoutId: workout.id,
+            durationSeconds,
+            rpe,
+            notes,
+            createdAt: serverTimestamp()
+        });
+
+        // 2. Mark Workout as Completed
+        const ref = doc(db, 'workouts', workout.id);
+        const docSnap = await getDoc(ref);
+        if (docSnap.exists()) {
+             await updateDoc(ref, { completed: true });
+        }
+
+        // 3. Update User Points
+        await updateDoc(doc(db, 'users', currentUser.id), {
+            points: newPoints
+        });
+
+        onClose();
+    } catch (err) {
+        console.error("Error saving session", err);
+        alert("Ocorreu um erro ao salvar o treino.");
+    } finally {
+        setSaving(false);
+    }
   };
 
   return (
@@ -540,61 +660,108 @@ const ExecuteWorkoutModal = ({ workout, onClose }: { workout: Workout, onClose: 
        className="fixed inset-0 z-50 bg-pastel-bg sm:max-w-md sm:mx-auto flex flex-col overflow-hidden"
     >
        <header className="sticky top-0 z-40 bg-pastel-bg/90 backdrop-blur-2xl border-b border-pastel-border px-4 py-4 flex items-center gap-3 shadow-sm">
-         <button onClick={onClose} className="p-2 -ml-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
+         <button onClick={onClose} disabled={saving} className="p-2 -ml-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
            <ChevronLeft size={24} />
          </button>
          <h2 className="font-bold text-lg truncate flex-1 text-white">{workout.title}</h2>
        </header>
 
-       <TimerBar activeRestState={activeRestState} onSkip={() => setActiveRestState(null)} />
+       {!finishing ? (
+         <>
+           <TimerBar activeRestState={activeRestState} onSkip={() => setActiveRestState(null)} />
 
-       <div className="flex-1 overflow-y-auto p-4 pb-32">
-         {workout.exercises.map(ex => (
-           <div key={ex.id} className="glass p-4 rounded-2xl mb-4">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="font-bold text-base flex-1 pr-4">{ex.name}</h3>
-                <button onClick={() => setSelectedExercise(ex)} className="w-8 h-8 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center">
-                  <Info size={16} />
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-2 mb-5">
-                 <div className="bg-white/5 rounded-lg p-2 text-center">
-                   <span className="mono opacity-50 block mb-1">SÉRIES</span>
-                   <span className="font-bold">{ex.sets}</span>
-                 </div>
-                 <div className="bg-white/5 rounded-lg p-2 text-center">
-                   <span className="mono opacity-50 block mb-1">REPS</span>
-                   <span className="font-bold">{ex.reps}</span>
-                 </div>
-                 <div className="bg-white/5 rounded-lg p-2 text-center">
-                   <span className="mono opacity-50 block mb-1">CARGA</span>
-                   <span className="font-bold accent-text">{ex.weight}</span>
-                 </div>
-              </div>
+           <div className="flex-1 overflow-y-auto p-4 pb-32">
+             {workout.exercises.map(ex => (
+               <div key={ex.id} className="glass p-4 rounded-2xl mb-4">
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="font-bold text-base flex-1 pr-4">{ex.name}</h3>
+                    <button onClick={() => setSelectedExercise(ex)} className="w-8 h-8 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center">
+                      <Info size={16} />
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 mb-5">
+                     <div className="bg-white/5 rounded-lg p-2 text-center">
+                       <span className="mono opacity-50 block mb-1">SÉRIES</span>
+                       <span className="font-bold">{ex.sets}</span>
+                     </div>
+                     <div className="bg-white/5 rounded-lg p-2 text-center">
+                       <span className="mono opacity-50 block mb-1">REPS</span>
+                       <span className="font-bold">{ex.reps}</span>
+                     </div>
+                     <div className="bg-white/5 rounded-lg p-2 text-center">
+                       <span className="mono opacity-50 block mb-1">CARGA</span>
+                       <span className="font-bold accent-text">{ex.weight}</span>
+                     </div>
+                  </div>
 
-              <button 
-                onClick={() => startRest(ex.restSeconds)} 
-                className="w-full py-3 rounded-xl border border-[#00ff66]/30 text-[#00ff66] font-bold text-xs uppercase flex items-center justify-center gap-2 hover:bg-[#00ff66] hover:text-black transition-colors"
-              >
-                 Reiniciar Descanso ({ex.restSeconds}s)
-              </button>
+                  <button 
+                    onClick={() => startRest(ex.restSeconds)} 
+                    className="w-full py-3 rounded-xl border border-[#00ff66]/30 text-[#00ff66] font-bold text-xs uppercase flex items-center justify-center gap-2 hover:bg-[#00ff66] hover:text-black transition-colors"
+                  >
+                     Reiniciar Descanso ({ex.restSeconds}s)
+                  </button>
+               </div>
+             ))}
+
+             {workout.exercises.length === 0 && (
+               <div className="text-center py-10 text-pastel-muted flex flex-col items-center gap-3">
+                 <Dumbbell size={48} opacity={0.2} />
+                 <p>Nenhum exercício adicionado a este treino.</p>
+               </div>
+             )}
+
+             <button onClick={handleFinish} className="mt-8 w-full py-4 rounded-2xl accent-bg text-black font-black text-sm uppercase tracking-widest shadow-[0_0_20px_rgba(0,255,102,0.3)] hover:scale-[0.98] transition-transform mb-8">
+                <CheckCircle2 size={24} className="inline-block mr-2" /> Finalizar Treino
+             </button>
            </div>
-         ))}
+         </>
+       ) : (
+         <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center fade-in">
+             <div className="w-20 h-20 rounded-full accent-bg flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(0,255,102,0.4)]">
+                 <CheckCircle2 size={40} className="text-black" />
+             </div>
+             <h2 className="text-3xl font-black text-white mb-2">Treino Finalizado!</h2>
+             <p className="text-pastel-muted text-center mb-10">Mande seu relatório para o treinador.</p>
 
-         {workout.exercises.length === 0 && (
-           <div className="text-center py-10 text-pastel-muted flex flex-col items-center gap-3">
-             <Dumbbell size={48} opacity={0.2} />
-             <p>Nenhum exercício adicionado a este treino.</p>
-           </div>
-         )}
+             <div className="w-full glass p-6 rounded-3xl mb-6">
+                 <label className="block mono font-bold opacity-80 mb-4 text-center">RPE (Esforço Percebido)</label>
+                 <div className="flex justify-between items-center mb-2 px-2">
+                     <span className="text-xs text-[#00ff66]">Muito Leve</span>
+                     <span className="text-2xl font-black">{rpe}</span>
+                     <span className="text-xs text-red-500">Exaustivo</span>
+                 </div>
+                 <input 
+                    type="range" min="1" max="10" step="1" 
+                    value={rpe} onChange={(e) => setRpe(Number(e.target.value))}
+                    className="w-full h-2 rounded-lg appearance-none bg-white/10 outline-none thumb-accent"
+                 />
+                 <style dangerouslySetInnerHTML={{__html: `
+                    input[type=range]::-webkit-slider-thumb {
+                        appearance: none;
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 50%;
+                        background: #00ff66;
+                        cursor: pointer;
+                    }
+                 `}} />
+             </div>
 
-         <button onClick={() => {
-            onClose();
-         }} className="mt-8 w-full py-4 rounded-2xl accent-bg text-black font-black text-sm uppercase tracking-widest shadow-[0_0_20px_rgba(0,255,102,0.3)] hover:scale-[0.98] transition-transform mb-8">
-            <CheckCircle2 size={24} className="inline-block mr-2" /> Concluir Treino
-         </button>
-       </div>
+             <div className="w-full mb-8">
+                 <label className="block mono font-bold opacity-80 mb-2">Notas / Feedback (Opcional)</label>
+                 <textarea 
+                    value={notes} onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Sentiu alguma dor? O tempo estava curto?"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-[#00ff66] transition-colors resize-none h-32"
+                 />
+             </div>
+
+             <button onClick={handleFinish} disabled={saving} className="w-full py-4 rounded-2xl accent-bg text-black font-black text-sm uppercase tracking-widest shadow-[0_0_20px_rgba(0,255,102,0.3)] hover:scale-[0.98] transition-all disabled:opacity-50">
+                {saving ? 'Enviando...' : 'Salvar no Diário'}
+             </button>
+         </div>
+       )}
 
        {/* Info Modal */}
        <AnimatePresence>
@@ -742,8 +909,8 @@ export default function App() {
           <main className="flex-1 overflow-y-auto relative z-10 scrollbar-hide pb-20 sm:pb-0">
             <AnimatePresence mode="popLayout">
               {activeTab === 'home' && <HomeView key="home" user={currentUser} completedWorkouts={completedWorkouts} weeklyCompleted={weeklyCompleted} weeklyGoal={weeklyGoal} />}
-              {activeTab === 'treinos' && <TreinosView key="treinos" onExecute={setExecutingWorkout} />}
-              {activeTab === 'alunos' && <AlunosView key="alunos" />}
+              {activeTab === 'treinos' && <TreinosView key="treinos" currentUser={currentUser} onExecute={setExecutingWorkout} />}
+              {activeTab === 'alunos' && <AlunosView key="alunos" currentUser={currentUser} />}
               {activeTab === 'rank' && <RankView key="rank" />}
             </AnimatePresence>
           </main>
@@ -754,7 +921,7 @@ export default function App() {
 
       {/* FULLSCREEN MODALS */}
       <AnimatePresence>
-         {executingWorkout && <ExecuteWorkoutModal workout={executingWorkout} onClose={handleFinishWorkout} />}
+         {executingWorkout && currentUser && <ExecuteWorkoutModal workout={executingWorkout} currentUser={currentUser} onClose={handleFinishWorkout} />}
       </AnimatePresence>
     </div>
   );

@@ -81,7 +81,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isSignedIn() && isValidId(userId);
-      allow list: if isSignedIn() && (resource.data.role == 'coach' || resource.data.coachId == request.auth.uid || userId == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.role == 'coach' || resource.data.coachId == request.auth.uid || isCoach(request.auth.uid) || userId == request.auth.uid);
       
       allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) && incoming().points == 0;
       
