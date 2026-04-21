@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -28,7 +28,7 @@ export const signInWithGoogle = async () => {
   }
 };
 
-export { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile };
+export { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile, doc, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, serverTimestamp };
 export const logout = () => signOut(auth);
 
 export interface FirestoreErrorInfo {
