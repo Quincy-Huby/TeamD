@@ -581,7 +581,7 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-6 pt-28 pb-32">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-6 pt-32 pb-32">
       <div className="flex items-center justify-between mb-8">
         <div className="flex flex-col">
           <span className="mono text-[10px] uppercase opacity-40 tracking-[0.3em] mb-1">Status do Predador</span>
@@ -811,7 +811,7 @@ export const TreinosView = React.memo(({ currentUser, onExecute }: {
   }, [currentUser.id]);
 
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 pt-28 pb-32">
+    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 pt-32 pb-32">
       <h2 className="text-3xl font-black mb-8 tracking-tighter uppercase">Arsenal de Ataque</h2>
 
       <div className="flex flex-col gap-4">
@@ -935,7 +935,7 @@ export const AlunosView = React.memo(({ currentUser, onSelectStudent, onAssignWo
   });
 
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="p-6 pt-28 pb-32">
+    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="p-6 pt-32 pb-32">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-black tracking-tighter uppercase mb-1">O Ninho</h2>
@@ -1174,7 +1174,7 @@ export const RankView = React.memo(({ currentUser, onSelectStudent }: { currentU
   if (loading) return <div className="flex-1 flex items-center justify-center p-20"><div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-atheris-accent animate-spin" /></div>;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-6 pt-28 pb-32 min-h-screen relative overflow-hidden">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-6 pt-32 pb-32 min-h-screen relative overflow-hidden">
       {/* Background Ambience */}
       <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-atheris-accent/5 to-transparent pointer-events-none" />
       <div className="absolute top-[10%] left-[10%] w-[80%] h-[300px] bg-white/[0.02] blur-[120px] rounded-full pointer-events-none" />
@@ -1475,7 +1475,7 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
   const remaining = nextTier.min - points;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-6 pt-28 pb-32 min-h-full flex flex-col items-center">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-6 pt-32 pb-32 min-h-full flex flex-col items-center">
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoChange} />
       
       {/* Centered Profile Header */}
