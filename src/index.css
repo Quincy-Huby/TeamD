@@ -17,7 +17,8 @@
 body {
   background-color: var(--color-atheris-bg);
   color: var(--color-atheris-text);
-  overflow: hidden; 
+  overflow-x: hidden; 
+  overscroll-behavior-y: none;
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
   user-select: none; 

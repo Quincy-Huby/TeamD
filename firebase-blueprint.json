@@ -12,6 +12,9 @@
         "tier": { "type": "string" },
         "avatar": { "type": "string" },
         "coachId": { "type": "string" },
+        "heightCm": { "type": "number" },
+        "birthday": { "type": "string" },
+        "targetWeightKg": { "type": "number" },
         "createdAt": { "type": "string", "format": "timestamp" }
       },
       "required": ["name", "email", "role", "points", "createdAt"]
@@ -36,20 +39,23 @@
     },
     "Workout": {
       "title": "Workout",
-      "description": "A customized workout assigned to a student.",
+      "description": "A customized workout or challenge assigned to a student.",
       "type": "object",
       "properties": {
         "title": { "type": "string" },
         "authorId": { "type": "string" },
-        "assignedTo": { "type": "string" },
+        "studentId": { "type": "string" },
+        "type": { "type": "string", "enum": ["regular", "challenge"] },
+        "points": { "type": "number" },
         "completed": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "timestamp" },
+        "expiresAt": { "type": "string", "format": "timestamp" },
         "exercises": { 
           "type": "array",
           "items": { "$ref": "#/entities/Exercise" }
         }
       },
-      "required": ["title", "authorId", "assignedTo", "completed", "createdAt", "exercises"]
+      "required": ["title", "authorId", "studentId", "completed", "createdAt", "exercises"]
     },
     "Session": {
       "title": "Workout Session",
@@ -60,7 +66,7 @@
         "workoutId": { "type": "string" },
         "coachId": { "type": "string" },
         "durationSeconds": { "type": "number" },
-        "rpe": { "type": "number", "description": "Rating of perceived exertion 1-10" },
+        "rpe": { "type": "number" },
         "notes": { "type": "string" },
         "createdAt": { "type": "string", "format": "timestamp" }
       },
@@ -74,10 +80,29 @@
         "studentId": { "type": "string" },
         "coachId": { "type": "string" },
         "weightKg": { "type": "number" },
+        "targetWeightKg": { "type": "number" },
+        "heightCm": { "type": "number" },
+        "birthday": { "type": "string" },
+        "mood": { "type": "number" },
         "notes": { "type": "string" },
         "createdAt": { "type": "string", "format": "timestamp" }
       },
-      "required": ["studentId", "weightKg", "createdAt", "coachId"]
+      "required": ["studentId", "weightKg", "createdAt", "coachId", "mood"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Chat message between student and coach.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["text", "report", "checkin"] },
+        "metadata": { "type": "object" },
+        "createdAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["senderId", "senderName", "receiverId", "content", "type", "createdAt"]
     }
   },
   "firestore": {
@@ -93,9 +118,13 @@
       "schema": { "$ref": "#/entities/Session" },
       "description": "Logs of completed workouts."
     },
-    "/check_ins/{checkInId}": {
+    "/checkins/{checkInId}": {
       "schema": { "$ref": "#/entities/CheckIn" },
       "description": "Weekly check-in logs with bodyweight and measures."
+    },
+    "/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Chat messages and automated reports."
     }
   }
 }

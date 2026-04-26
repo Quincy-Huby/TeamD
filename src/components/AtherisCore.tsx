@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Role } from '../types';
-import { Home, Users, Dumbbell, Trophy, Info, Zap, ChevronLeft, LogOut, Image as ImageIcon } from 'lucide-react';
+import { LayoutGrid, Users, Dumbbell, Trophy, Info, Zap, ChevronLeft, LogOut, Image as ImageIcon, MessageSquare, User } from 'lucide-react';
 
 export const BackgroundBlobs = React.memo(() => (
   <>
@@ -21,49 +21,67 @@ export const Header = React.memo(({ user, onLogout, isDarkMode, setIsDarkMode, o
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !onUpdateUser) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_SIZE = 400; // Better quality, still small
-        let width = img.width;
-        let height = img.height;
+    setIsUploading(true);
 
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height = Math.round((height * MAX_SIZE) / width);
-            width = MAX_SIZE;
+    try {
+      const compressedDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 400; // Better quality, still small
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height = Math.round((height * MAX_SIZE) / width);
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width = Math.round((width * MAX_SIZE) / height);
+                height = MAX_SIZE;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/png'));
+            } else {
+              reject(new Error('Canvas context not available'));
+            }
+          };
+          img.onerror = () => reject(new Error('Image processing failed'));
+          if (event.target?.result) {
+            img.src = event.target.result as string;
+          } else {
+            reject(new Error('Failed to read image'));
           }
-        } else {
-          if (height > MAX_SIZE) {
-            width = Math.round((width * MAX_SIZE) / height);
-            height = MAX_SIZE;
-          }
-        }
+        };
+        reader.onerror = () => reject(new Error('File reading failed'));
+        reader.readAsDataURL(file);
+      });
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL('image/png'); // Preserves transparent PNGs!
-          onUpdateUser({ avatar: compressedDataUrl });
-        }
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-
-    // Reset input so the user can select the same file again if they want
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      await onUpdateUser({ avatar: compressedDataUrl });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -77,17 +95,23 @@ export const Header = React.memo(({ user, onLogout, isDarkMode, setIsDarkMode, o
         <div className="flex flex-col">
           <span className="font-extrabold text-lg text-atheris-text leading-none tracking-tighter uppercase">Atheris</span>
           <span className="mono text-[9px] text-atheris-accent uppercase tracking-widest font-black">
-            {user.role === 'coach' ? 'Nível Alpha' : 'Protocolo Viper'}
+            {user.role === 'coach' ? 'Nível Atherium' : 'Protocolo Viper'}
           </span>
         </div>
       </div>
 
          <div className="relative">
            <button 
+            disabled={isUploading}
             onClick={() => setMenuOpen(!menuOpen)}
-            className="w-10 h-10 rounded-full bg-atheris-text/5 flex items-center justify-center text-atheris-text border border-white/5 hover:border-atheris-accent transition-colors overflow-hidden"
+            className="w-10 h-10 rounded-full bg-atheris-text/5 flex items-center justify-center text-atheris-text border border-white/5 hover:border-atheris-accent transition-colors overflow-hidden relative group"
            >
              {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="avatar" /> : user.name[0]}
+             {isUploading && (
+               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
+                 <div className="w-5 h-5 border-2 border-white/20 border-t-atheris-accent rounded-full animate-spin" />
+               </div>
+             )}
            </button>
 
            <input type="file" ref={fileInputRef} className="hidden" accept="image/*, .png, .jpg, .jpeg, .webp" onChange={handlePhotoChange} />
@@ -100,7 +124,7 @@ export const Header = React.memo(({ user, onLogout, isDarkMode, setIsDarkMode, o
                >
                  <div className="p-3 border-b border-white/5 mb-1">
                    <p className="font-bold text-sm text-atheris-text truncate">{user.name}</p>
-                   <p className="text-[10px] mono opacity-50 uppercase mt-0.5">{user.role === 'coach' ? 'Alpha Coach' : 'Víbora'}</p>
+                   <p className="text-[10px] mono opacity-50 uppercase mt-0.5">{user.role === 'coach' ? 'Atherium' : 'Víbora'}</p>
                  </div>
 
                  <button onClick={() => { fileInputRef.current?.click(); setMenuOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-atheris-text flex items-center gap-3 hover:bg-white/5 rounded-xl transition-colors">
@@ -131,7 +155,7 @@ export const Header = React.memo(({ user, onLogout, isDarkMode, setIsDarkMode, o
          {settingsOpen && (
            <motion.div 
              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-             className="fixed inset-0 z-[100] bg-atheris-bg sm:max-w-md sm:mx-auto flex flex-col shadow-2xl"
+             className="fixed inset-0 z-[100] bg-atheris-bg flex flex-col shadow-2xl"
            >
              <header className="p-4 pt-12 flex items-center gap-3 border-b border-white/5">
                 <button onClick={() => setSettingsOpen(false)} className="p-2 bg-white/5 rounded-full"><ChevronLeft size={24} /></button>
@@ -173,21 +197,13 @@ export const TabBar = React.memo(({ role, activeTab, setActiveTab }: {
   setActiveTab: (tab: string) => void
 }) => {
   return (
-    <nav className="fixed bottom-0 left-0 w-full glass border-t border-white/10 px-6 pb-8 pt-4 flex justify-between items-center z-50 sm:max-w-md sm:left-[50%] sm:translate-x-[-50%]">
+    <nav className="fixed bottom-0 left-0 w-full glass border-t border-white/10 px-4 pb-8 pt-4 flex justify-around items-center z-50 sm:max-w-md sm:left-[50%] sm:translate-x-[-50%]">
       <button 
         onClick={() => setActiveTab('home')}
         className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'home' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
       >
-        <Home size={activeTab === 'home' ? 24 : 20} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
-        <span className="text-[10px] mono font-bold uppercase tracking-widest">Home</span>
-      </button>
-
-      <button 
-        onClick={() => setActiveTab('treinos')}
-        className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'treinos' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
-      >
-        <Dumbbell size={activeTab === 'treinos' ? 24 : 20} strokeWidth={activeTab === 'treinos' ? 2.5 : 2} />
-        <span className="text-[10px] mono font-bold uppercase tracking-widest">Treinos</span>
+        <LayoutGrid size={activeTab === 'home' ? 24 : 20} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
+        <span className="text-[10px] mono font-bold uppercase tracking-widest">HQ</span>
       </button>
 
       {role === 'coach' ? (
@@ -199,14 +215,40 @@ export const TabBar = React.memo(({ role, activeTab, setActiveTab }: {
           <span className="text-[10px] mono font-bold uppercase tracking-widest">Ninho</span>
         </button>
       ) : (
-        <button 
-          onClick={() => setActiveTab('rank')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'rank' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
-        >
-          <Trophy size={activeTab === 'rank' ? 24 : 20} strokeWidth={activeTab === 'rank' ? 2.5 : 2} />
-          <span className="text-[10px] mono font-bold uppercase tracking-widest">Rank</span>
-        </button>
+        <>
+          <button 
+            onClick={() => setActiveTab('treinos')}
+            className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'treinos' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
+          >
+            <Dumbbell size={activeTab === 'treinos' ? 24 : 20} strokeWidth={activeTab === 'treinos' ? 2.5 : 2} />
+            <span className="text-[10px] mono font-bold uppercase tracking-widest">Treinos</span>
+          </button>
+          
+          <button 
+            onClick={() => setActiveTab('rank')}
+            className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'rank' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
+          >
+            <Trophy size={activeTab === 'rank' ? 24 : 20} strokeWidth={activeTab === 'rank' ? 2.5 : 2} />
+            <span className="text-[10px] mono font-bold uppercase tracking-widest">Rank</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('perfil')}
+            className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'perfil' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
+          >
+            <User size={activeTab === 'perfil' ? 24 : 20} strokeWidth={activeTab === 'perfil' ? 2.5 : 2} />
+            <span className="text-[10px] mono font-bold uppercase tracking-widest">Perfil</span>
+          </button>
+        </>
       )}
+
+      <button 
+        onClick={() => setActiveTab('chat')}
+        className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'chat' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
+      >
+        <MessageSquare size={activeTab === 'chat' ? 24 : 20} strokeWidth={activeTab === 'chat' ? 2.5 : 2} />
+        <span className="text-[10px] mono font-bold uppercase tracking-widest">Chat</span>
+      </button>
     </nav>
   );
 });

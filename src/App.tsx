@@ -3,11 +3,11 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Trophy, Info, Zap } from 'lucide-react';
 import { User, Workout, Role } from './types';
 import { auth, db, logout } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { classNames } from './lib/utils';
 import { BackgroundBlobs, Header, TabBar } from './components/AtherisCore';
-import { HomeView, TreinosView, AlunosView, RankView } from './components/AtherisViews';
+import { HomeView, TreinosView, AlunosView, RankView, AdminChatView, ProfileView } from './components/AtherisViews';
 import { ExecuteWorkoutModal, CheckInModal, StudentDetailModal, WorkoutCreatorModal } from './components/AtherisModals';
 
 // --- AUTHENTICATION COMPONENTS ---
@@ -21,24 +21,143 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email) return setError("Por favor insira seu email.");
+    if (mode !== 'recover' && !password) return setError("Por favor insira sua senha.");
+    if (mode === 'register' && !name) return setError("Por favor insira seu nome.");
+
+    setError('');
     setLoading(true);
-    // ... logic simplifies here to match actual firebase interaction in App component
-    setLoading(false);
+
+    try {
+      if (mode === 'login') {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else if (mode === 'register') {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(cred.user, { displayName: name });
+        // Make sure it saves to firestore
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          name,
+          email,
+          role: 'student',
+          points: 0,
+          tier: 'Jararaca',
+          createdAt: serverTimestamp()
+        });
+      } else if (mode === 'recover') {
+        await sendPasswordResetEmail(auth, email);
+        setError('Um e-mail de recuperação foi enviado.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      const code = err.code || '';
+      let msg = 'Falha na autenticação.';
+      
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        msg = 'E-mail ou senha incorretos. Verifique seus dados.';
+      } else if (code === 'auth/email-already-in-use') {
+        msg = 'Este e-mail já está em uso.';
+      } else if (code === 'auth/invalid-email') {
+        msg = 'E-mail inválido.';
+      } else if (code === 'auth/weak-password') {
+        msg = 'Senha muito fraca (mínimo 6 caracteres).';
+      } else if (code === 'auth/too-many-requests') {
+        msg = 'Muitas tentativas. Tente novamente mais tarde.';
+      }
+      
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const { signInWithGoogle } = await import('./firebase');
+      await signInWithGoogle();
+    } catch (err: any) {
+      console.error(err);
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError('Erro ao acessar com Google.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 z-10 w-full max-w-sm mx-auto">
-       <h1 className="text-5xl font-black text-atheris-text tracking-tighter mb-4">ATHERIS</h1>
-       <p className="text-atheris-accent mono mb-8">Por favor, acesse o habitat via login.</p>
+       <h1 className="text-5xl font-black text-atheris-text tracking-tighter mb-4 text-center">ATHERIS</h1>
+       <p className="text-atheris-accent mono mb-8">Por favor, acesse o habitat.</p>
+
+       <form onSubmit={handleSubmit} className="w-full mb-6">
+          {error && <p className="text-red-400 text-sm mb-4 text-center font-bold bg-red-400/10 p-3 rounded-2xl border border-red-400/20">{error}</p>}
+          
+          {mode === 'register' && (
+            <input 
+              type="text" 
+              placeholder="Seu Nome (Codinome)" 
+              value={name} 
+              onChange={e => setName(e.target.value)} 
+              className="w-full bg-atheris-text/5 border border-white/10 rounded-2xl p-4 text-sm mb-3 focus:border-atheris-accent outline-none"
+            />
+          )}
+
+          <input 
+            type="email" 
+            placeholder="E-mail" 
+            value={email} 
+            onChange={e => setEmail(e.target.value)} 
+            className="w-full bg-atheris-text/5 border border-white/10 rounded-2xl p-4 text-sm mb-3 focus:border-atheris-accent outline-none"
+          />
+
+          {mode !== 'recover' && (
+            <input 
+              type="password" 
+              placeholder="Senha" 
+              value={password} 
+              onChange={e => setPassword(e.target.value)} 
+              className="w-full bg-atheris-text/5 border border-white/10 rounded-2xl p-4 text-sm mb-4 focus:border-atheris-accent outline-none"
+            />
+          )}
+
+          <button 
+           type="submit"
+           disabled={loading}
+           className="w-full bg-atheris-accent text-black font-black uppercase tracking-widest text-sm py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,255,102,0.2)] disabled:opacity-50"
+          >
+            {loading ? 'Processando...' : mode === 'login' ? 'Iniciar Acesso' : mode === 'register' ? 'Criar Protocolo' : 'Recuperar Acesso'}
+          </button>
+       </form>
+
+       <div className="flex items-center gap-4 w-full mb-6 opacity-30">
+          <div className="h-px bg-white flex-1"></div>
+          <span className="mono text-[10px] uppercase">OU</span>
+          <div className="h-px bg-white flex-1"></div>
+       </div>
+
        <button 
-        onClick={() => import('./firebase').then(f => f.signInWithGoogle())}
-        className="w-full bg-white text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl"
+        onClick={handleGoogleLogin}
+        disabled={loading}
+        className="w-full bg-white text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl disabled:opacity-50"
        >
          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
            <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
          </svg>
          Portal Google
        </button>
+
+       <div className="mt-8 flex flex-col gap-2 w-full text-center">
+         {mode === 'login' ? (
+           <>
+             <button onClick={() => setMode('register')} className="text-sm opacity-60 hover:opacity-100 hover:text-atheris-accent">Não tem um perfil? <span className="font-bold underline">Registre-se</span></button>
+             <button onClick={() => setMode('recover')} className="text-xs opacity-40 hover:opacity-100 mt-2">Esqueceu o login?</button>
+           </>
+         ) : (
+           <button onClick={() => setMode('login')} className="text-sm opacity-60 hover:opacity-100 hover:text-atheris-accent">Voltar para o Login</button>
+         )}
+       </div>
     </div>
   );
 });
@@ -54,6 +173,7 @@ export default function App() {
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [notifications, setNotifications] = useState<{id: string, title: string, message: string, type: string}[]>([]);
+  const [stats, setStats] = useState({ completed: 0, weekly: 0 });
 
   // Memoized action handlers to prevent re-renders
   const addNotification = useCallback((title: string, message: string, type = 'info') => {
@@ -62,9 +182,56 @@ export default function App() {
     setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 5000);
   }, []);
 
+  const loadUserStats = useCallback(async (userId: string) => {
+    try {
+      const q = query(collection(db, 'workouts'), where('studentId', '==', userId), where('completed', '==', true));
+      const snaps = await getDocs(q);
+      
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      let monthlyWorkouts = 0;
+      const weeksActive = new Set<string>();
+
+      // Get ISO week number calculation
+      const getWeekKey = (d: Date) => {
+        const target = new Date(d.valueOf());
+        const dayNr = (d.getDay() + 6) % 7;
+        target.setDate(target.getDate() - dayNr + 3);
+        const firstThursday = target.valueOf();
+        target.setMonth(0, 1);
+        if (target.getDay() !== 4) {
+          target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+        }
+        const weekNum = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+        return `${target.getFullYear()}-W${weekNum}`;
+      };
+      
+      snaps.forEach(doc => {
+         const data = doc.data();
+         if (data.authorId === userId) return; // Ignore Quick Hits (home workouts) in stats
+         
+         if (data.updatedAt) {
+            const completedDate = data.updatedAt.toDate();
+            // Checking if the workout happened in the current calendar month
+            if (completedDate.getMonth() === currentMonth && completedDate.getFullYear() === currentYear) {
+               monthlyWorkouts++;
+               weeksActive.add(getWeekKey(completedDate));
+            }
+         }
+      });
+      
+      setStats({ completed: monthlyWorkouts, weekly: weeksActive.size });
+    } catch (err) {
+      console.error("Failed to load stats", err);
+    }
+  }, []);
+
   const handleLogout = useCallback(() => {
     logout();
     setActiveTab('home');
+    setStats({ completed: 0, weekly: 0 });
   }, []);
 
   const toggleDarkMode = useCallback((v: boolean) => setIsDarkMode(v), []);
@@ -81,58 +248,133 @@ export default function App() {
     setSelectedStudent(null);
   }, [selectedStudent]);
 
-  const handleFinishWorkout = useCallback(() => {
-    addNotification('Bote Registrado', 'Sua evolução foi inoculada com sucesso.', 'achievement');
+  const handleExecuteQuickHit = useCallback(async (title: string) => {
+    if (!currentUser) return;
+    
+    // Switch view to treinos
+    setActiveTab('treinos');
+    addNotification('Protocolo Gerado', `O bote rápido ${title} foi criado na sua lista.`, 'info');
+
+    let exercises = [];
+    switch(title) {
+      case 'Flow Predator':
+        exercises = [{ id: 'e1', name: 'Mobilidade Articular', sets: 1, reps: '15 min', weight: 'Corporal', restSeconds: 0, muscleGroup: 'Corpo Todo', difficulty: 'Jararaca', purpose: 'Soltar as articulações e melhorar amplitude.', instructions: 'Mova ombros, quadril e calcanhares.' }]; break;
+      case 'Inoculação HIT':
+        exercises = [
+          { id: 'e1', name: 'Burpees', sets: 4, reps: '30s', weight: 'Corporal', restSeconds: 30, muscleGroup: 'Corpo Todo', difficulty: 'Naja Real', purpose: 'Elevar FC ao máximo.', instructions: 'Salte, prancha, flexão e retorne.' },
+          { id: 'e2', name: 'Mountain Climbers', sets: 4, reps: '30s', weight: 'Corporal', restSeconds: 30, muscleGroup: 'Core', difficulty: 'Cascavel', purpose: 'Cardio e core.', instructions: 'Acelere pernas na prancha.' }
+        ]; break;
+      case 'Víbora Atenta':
+        exercises = [{ id: 'e1', name: 'Controle de Respiração', sets: 1, reps: '10 min', weight: 'Mental', restSeconds: 0, muscleGroup: 'Mindset', difficulty: 'Jararaca', purpose: 'Mindset e foco.', instructions: 'Medite na técnica 4-4-4.' }]; break;
+      case 'Camuflagem':
+        exercises = [{ id: 'e1', name: 'Prancha Isométrica', sets: 4, reps: '60s', weight: 'Corporal', restSeconds: 30, muscleGroup: 'Core', difficulty: 'Cascavel', purpose: 'Estabilização do tronco.', instructions: 'Segure a posição neutra firme.' }]; break;
+      case 'Bote Rápido':
+        exercises = [{ id: 'e1', name: 'Flexão Explosiva', sets: 3, reps: '15', weight: 'Corporal', restSeconds: 45, muscleGroup: 'Peitoral', difficulty: 'Cascavel', purpose: 'Ativação muscular.', instructions: 'Desça lento e empurre forte.' }]; break;
+      case 'Troca de Pele':
+        exercises = [{ id: 'e1', name: 'Alongamento Profundo', sets: 1, reps: '25 min', weight: 'Corporal', restSeconds: 0, muscleGroup: 'Corpo Todo', difficulty: 'Jararaca', purpose: 'Recuperação.', instructions: 'Mantenha poses por 60s.' }]; break;
+      default:
+        exercises = [{ id: 'e1', name: 'Bote Aleatório', sets: 3, reps: '10', weight: 'Corporal', restSeconds: 30, muscleGroup: 'Corpo', difficulty: 'Jararaca', purpose: 'Moção.', instructions: 'Mova-se.' }];
+    }
+
+    const newWorkoutData = {
+       title: title,
+       studentId: currentUser.id,
+       authorId: currentUser.id,
+       completed: false,
+       exercises: exercises,
+       createdAt: serverTimestamp()
+    };
+
+    try {
+       await addDoc(collection(db, 'workouts'), newWorkoutData);
+    } catch(err) {
+       console.error("Erro ao gerar treino rápido", err);
+    }
+  }, [currentUser, addNotification]);
+
+  const handleCancelWorkout = useCallback(() => {
     setExecutingWorkout(null);
-  }, [addNotification]);
+    setActiveTab('home');
+  }, []);
+
+  const handleFinishWorkout = useCallback((workout: Workout) => {
+    const isQuickHit = workout.authorId === workout.studentId;
+    const isChallenge = workout.type === 'challenge';
+    
+    if (isChallenge) {
+      addNotification('V-Points Adquiridos', `Desafio concluído: +${workout.points || 25} V-Points.`, 'achievement');
+    } else if (isQuickHit) {
+      addNotification('V-Points Adquiridos', 'Sua movimentação em casa gerou 5 V-Points.', 'info');
+    } else {
+      addNotification('Bote Registrado', 'Sua evolução foi inoculada com sucesso.', 'achievement');
+    }
+    
+    setActiveTab('home');
+    setExecutingWorkout(null);
+    if (currentUser) {
+      loadUserStats(currentUser.id);
+      updateDoc(doc(db, 'users', currentUser.id), { lastActiveAt: serverTimestamp() }).catch(console.error);
+    }
+  }, [addNotification, loadUserStats, currentUser]);
 
   // Sync Auth State
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (authUser) => {
-      if (authUser) {
-        const userDoc = await getDoc(doc(db, 'users', authUser.uid));
-        const isBypassCoach = authUser.email?.toLowerCase() === 'blackwoodstock1985@gmail.com';
-        
-        if (userDoc.exists()) {
-          const data = userDoc.data() as User;
-          if (isBypassCoach && data.role !== 'coach') {
-              const updated = { ...data, role: 'coach' as Role, tier: 'Treinador Alfa', name: 'Daniel' };
-              await updateDoc(doc(db, 'users', authUser.uid), { role: 'coach', tier: 'Treinador Alfa', name: 'Daniel' });
-              setCurrentUser(updated);
+      try {
+        if (authUser) {
+          const userDoc = await getDoc(doc(db, 'users', authUser.uid));
+          const isBypassCoach = authUser.email?.toLowerCase() === 'blackwoodstock1985@gmail.com';
+          
+          if (userDoc.exists()) {
+            const data = userDoc.data() as User;
+            if (isBypassCoach && data.role !== 'coach') {
+                const updated = { ...data, id: authUser.uid, role: 'coach' as Role, tier: 'Atheris Suprema', name: 'Daniel' };
+                await updateDoc(doc(db, 'users', authUser.uid), { role: 'coach', tier: 'Atheris Suprema', name: 'Daniel' });
+                setCurrentUser(updated);
+            } else {
+                setCurrentUser({ ...data, id: authUser.uid });
+            }
           } else {
-              setCurrentUser(data);
+            const newUser = {
+              id: authUser.uid,
+              name: isBypassCoach ? 'Daniel' : (authUser.displayName || 'Víbora Nova'),
+              email: authUser.email || '',
+              role: isBypassCoach ? 'coach' : 'student',
+              points: 0,
+              tier: isBypassCoach ? 'Atheris Suprema' : 'Jararaca',
+              avatar: authUser.photoURL || '',
+              createdAt: serverTimestamp(),
+              coachId: isBypassCoach ? '' : 'coach_daniel' // All students linked to this ID
+            };
+            await setDoc(doc(db, 'users', authUser.uid), newUser);
+            setCurrentUser(newUser as unknown as User);
           }
+          
+          loadUserStats(authUser.uid);
         } else {
-          const newUser = {
-            id: authUser.uid,
-            name: isBypassCoach ? 'Daniel' : (authUser.displayName || 'Víbora Nova'),
-            email: authUser.email || '',
-            role: isBypassCoach ? 'coach' : 'student',
-            points: 0,
-            tier: isBypassCoach ? 'Treinador Alfa' : 'Escoteiro',
-            avatar: authUser.photoURL || '',
-            createdAt: serverTimestamp(),
-            coachId: isBypassCoach ? '' : 'coach_daniel'
-          };
-          await setDoc(doc(db, 'users', authUser.uid), newUser);
-          setCurrentUser(newUser as unknown as User);
+          setCurrentUser(null);
         }
-      } else {
-        setCurrentUser(null);
+      } catch (err) {
+        console.error("Auth state sync error:", err);
+        // If profile loading fails, we might still be logged in but can't proceed
+        // Optionally sign out or show an error
+        // logout(); // This might be too aggressive if it's a transient network error
+      } finally {
+        setAuthLoading(false);
       }
-      setAuthLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [loadUserStats]);
 
   if (authLoading) return <div className="h-screen w-full bg-atheris-bg flex items-center justify-center mono text-xs uppercase tracking-widest opacity-40">Verificando Habitat...</div>;
 
   return (
-    <div className={classNames("h-[100dvh] w-full relative sm:max-w-md sm:mx-auto border-atheris-border flex flex-col text-atheris-text overflow-hidden bg-atheris-bg transition-colors duration-500", !isDarkMode && "light-mode")}>
+    <div className="min-h-[100dvh] w-full bg-black/90 flex items-center justify-center sm:py-4">
+      <div className={classNames("h-[100dvh] sm:h-[90vh] sm:max-h-[900px] w-full max-w-[430px] relative border-atheris-border flex flex-col text-atheris-text overflow-hidden bg-atheris-bg transition-colors duration-500 sm:rounded-[3rem] sm:border sm:border-white/10 sm:shadow-2xl", !isDarkMode && "light-mode")}>
       <BackgroundBlobs />
       
       {/* TOASTS */}
-      <div className="fixed top-14 left-0 w-full px-4 z-[100] pointer-events-none flex flex-col gap-2 items-center sm:max-w-md sm:left-[50%] sm:translate-x-[-50%]">
+      <div className="fixed top-14 left-0 w-full px-4 z-[100] pointer-events-none flex flex-col gap-2 items-center">
         <AnimatePresence>
           {notifications.map(n => (
             <motion.div key={n.id} initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="w-full glass p-4 rounded-2xl flex items-center gap-3 shadow-2xl border border-white/10">
@@ -151,7 +393,7 @@ export default function App() {
       {!currentUser ? <Login onLogin={setCurrentUser} /> : (
         <>
           <Header user={currentUser} onLogout={handleLogout} isDarkMode={isDarkMode} setIsDarkMode={toggleDarkMode} onSimulatePush={() => {
-             addNotification('Atenção Alfa', 'Um novo sinal foi detectado no ninho.', 'info');
+             addNotification('Atenção Atherium', 'Um novo sinal foi detectado no ninho.', 'info');
           }}
           onUpdateUser={async (data) => {
             const updated = { ...currentUser, ...data };
@@ -164,25 +406,37 @@ export default function App() {
           }}
           />
           
-          <main className="flex-1 overflow-y-auto relative z-10 scrollbar-hide pb-20">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden relative z-10 scrollbar-hide pb-20">
             <AnimatePresence mode="popLayout">
-              {activeTab === 'home' && <HomeView key="home" user={currentUser} completedWorkouts={12} weeklyCompleted={3} weeklyGoal={5} onCheckIn={startCheckIn} />}
+              {activeTab === 'home' && <HomeView key="home" user={currentUser} completedWorkouts={stats.completed} weeklyCompleted={stats.weekly} weeklyGoal={5} onCheckIn={startCheckIn} onExecuteQuickHit={handleExecuteQuickHit} onExecuteWorkout={setExecutingWorkout} />}
               {activeTab === 'treinos' && <TreinosView key="treinos" currentUser={currentUser} onExecute={setExecutingWorkout} />}
               {activeTab === 'alunos' && <AlunosView key="alunos" currentUser={currentUser} onSelectStudent={selectStudent} onAssignWorkout={assignToStudent} />}
-              {activeTab === 'rank' && <RankView key="rank" />}
+              {activeTab === 'chat' && <AdminChatView key="chat" currentUser={currentUser} onExecuteWorkout={setExecutingWorkout} />}
+              {activeTab === 'rank' && <RankView key="rank" currentUser={currentUser} onSelectStudent={selectStudent} />}
+              {activeTab === 'perfil' && <ProfileView key="perfil" currentUser={currentUser} onLogout={handleLogout} onUpdateUser={async (data) => {
+                if (!currentUser) return;
+                const updated = { ...currentUser, ...data };
+                setCurrentUser(updated);
+                try {
+                   await updateDoc(doc(db, 'users', currentUser.id), data);
+                } catch (err) {
+                   console.error('Failed to save to firebase', err);
+                }
+              }} />}
             </AnimatePresence>
           </main>
           
           <TabBar role={currentUser.role} activeTab={activeTab} setActiveTab={setActiveTab} />
           
           <AnimatePresence>
-            {executingWorkout && <ExecuteWorkoutModal workout={executingWorkout} currentUser={currentUser} onClose={handleFinishWorkout} />}
+            {executingWorkout && <ExecuteWorkoutModal workout={executingWorkout} currentUser={currentUser} onClose={handleCancelWorkout} onFinish={handleFinishWorkout} />}
             {isCheckingIn && <CheckInModal student={currentUser} onClose={closeCheckIn} onSaved={() => { closeCheckIn(); addNotification('Peso Registrado', 'Sua evolução foi armazenada.', 'achievement'); }} />}
             {selectedStudent && <StudentDetailModal student={selectedStudent} onClose={closeStudentDetail} onAssignWorkout={startWorkoutCreation} />}
             {isCreatingWorkoutFor && <WorkoutCreatorModal student={isCreatingWorkoutFor} coach={currentUser} onClose={closeWorkoutCreator} onCreated={() => { closeWorkoutCreator(); addNotification('Protocolo Enviado', 'O aluno já recebeu as ordens.', 'achievement'); }} />}
           </AnimatePresence>
         </>
       )}
+      </div>
     </div>
   );
 }

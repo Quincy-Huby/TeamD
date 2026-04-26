@@ -1,10 +1,19 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, enableIndexedDbPersistence, doc, getDocFromServer, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, serverTimestamp, onSnapshot, or, deleteDoc } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code == 'failed-precondition') {
+      console.warn("Multiple tabs open, persistence can only be enabled in one tab at a a time.");
+  } else if (err.code == 'unimplemented') {
+      console.warn("The current browser does not support all of the features required to enable persistence");
+  }
+});
+
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -28,7 +37,7 @@ export const signInWithGoogle = async () => {
   }
 };
 
-export { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile, doc, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, serverTimestamp };
+export { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile, doc, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, serverTimestamp, onSnapshot, or, deleteDoc };
 export const logout = () => signOut(auth);
 
 export interface FirestoreErrorInfo {
