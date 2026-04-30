@@ -8,7 +8,8 @@ import { classNames } from '../lib/utils';
 import { getSnakeRank } from '../lib/ranks';
 import { collection, query, where, getDocs, db, onSnapshot, orderBy, serverTimestamp, addDoc, getDoc, doc, or, handleFirestoreError } from '../firebase';
 import { BroadcastModal } from './AtherisModals';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import * as aiService from '../services/aiService';
 
 // ... (previous getSnakeRank and views continue)
 
@@ -24,12 +25,12 @@ export const AdminChatView = React.memo(({ currentUser, onExecuteWorkout }: { cu
 
   useEffect(() => {
     if (!isAdmin) return;
-    const q = query(collection(db, 'users'), where('role', '==', 'student'));
+    const q = query(collection(db, 'users'), where('role', '==', 'student'), where('coachId', '==', currentUser.id));
     const unsub = onSnapshot(q, (snap) => {
       setStudents(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })) as User[]);
       setLoading(false);
     }, (error) => {
-      console.error("AdminChatView 'users' query failed:", error);
+      handleFirestoreError(error, 'list', 'users');
     });
     return () => unsub();
   }, [isAdmin]);
@@ -40,7 +41,7 @@ export const AdminChatView = React.memo(({ currentUser, onExecuteWorkout }: { cu
       return;
     }
 
-    const coachIds = ['coach_daniel'];
+    const coachIds = ['coach_daniel', currentUser.coachId || ''];
     if (isAdmin) coachIds.push(currentUser.id);
     
     const q = isAdmin ? 
@@ -83,7 +84,7 @@ export const AdminChatView = React.memo(({ currentUser, onExecuteWorkout }: { cu
   const handleSend = async () => {
     if (!reply.trim() || !selectedStudentId) return;
     
-    const receiverId = isAdmin ? selectedStudentId : 'coach_daniel';
+    const receiverId = isAdmin ? selectedStudentId : (currentUser.coachId || 'coach_daniel');
 
     try {
       await addDoc(collection(db, 'messages'), {
@@ -152,7 +153,7 @@ export const AdminChatView = React.memo(({ currentUser, onExecuteWorkout }: { cu
         reader.readAsDataURL(file);
       });
 
-      const receiverId = isAdmin ? selectedStudentId : 'coach_daniel';
+      const receiverId = isAdmin ? selectedStudentId : (currentUser.coachId || 'coach_daniel');
 
       await addDoc(collection(db, 'messages'), {
         senderId: currentUser.id,
@@ -454,6 +455,8 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
   const [assignedWorkouts, setAssignedWorkouts] = useState<Workout[]>([]);
   const [nestStats, setNestStats] = useState({ total: 0, active: 0, alert: 0, dormant: 0 });
   const [challengeClaimed, setChallengeClaimed] = useState(false);
+  const [viperAdvice, setViperAdvice] = useState<string | null>(null);
+  const [loadingAdvice, setLoadingAdvice] = useState(false);
   
   // Calculate daily quick hits based on current date
   const todayDate = new Date();
@@ -565,6 +568,28 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
     }, 30000); // 30 seconds rotation
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (user.role === 'student' && !viperAdvice && !loadingAdvice) {
+      const fetchAdvice = async () => {
+        setLoadingAdvice(true);
+        try {
+          // Fetch checkins for context
+          const q = query(collection(db, 'checkins'), where('studentId', '==', user.id), orderBy('createdAt', 'desc'));
+          const snap = await getDocs(q);
+          const checkins = snap.docs.map(d => d.data());
+          
+          const advice = await aiService.getViperAdvice(user, checkins as any);
+          setViperAdvice(advice);
+        } catch (err) {
+          console.error("Erro ao obter conselho da víbora:", err);
+        } finally {
+          setLoadingAdvice(false);
+        }
+      };
+      fetchAdvice();
+    }
+  }, [user.id, user.role]);
 
   const getChallengeIcon = (iconName: string) => {
     switch(iconName) {
@@ -714,12 +739,40 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
             </div>
           </div>
 
-          {/* Predator Quote */}
-          <div className="mb-8 p-6 glass rounded-3xl border-l-4 border-atheris-accent relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 opacity-5"><Zap size={40} /></div>
-             <p className="text-atheris-text/80 italic text-sm leading-relaxed relative z-10">"{quote}"</p>
-             <p className="mono text-[10px] uppercase mt-4 text-atheris-accent tracking-widest font-bold">— MANTRA ATHERIS</p>
-          </div>
+      {/* Viper Advice / Bio-Insight Section */}
+      <div className="mb-10 relative">
+        <AnimatePresence mode="wait">
+          {viperAdvice ? (
+            <motion.div 
+              key="advice"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="glass p-6 rounded-[2.5rem] border border-atheris-accent/20 bg-atheris-accent/5 relative overflow-hidden shadow-2xl shadow-atheris-accent/5"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <Sparkles size={40} className="text-atheris-accent" />
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-atheris-accent animate-pulse" />
+                <span className="mono text-[9px] font-black uppercase tracking-[0.3em] text-atheris-accent">Bio-Insight Atheris</span>
+              </div>
+              <p className="text-lg font-black text-white leading-tight italic">
+                "{viperAdvice}"
+              </p>
+              <div className="mt-4 flex justify-end">
+                <span className="text-[7px] mono uppercase opacity-30 tracking-widest">— Atheris Suprema v3.0</span>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="p-6 glass rounded-3xl border-l-4 border-atheris-accent relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-5"><Zap size={40} /></div>
+               <p className="text-atheris-text/80 italic text-sm leading-relaxed relative z-10">"{quote}"</p>
+               <p className="mono text-[10px] uppercase mt-4 text-atheris-accent tracking-widest font-bold">— MANTRA ATHERIS</p>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
 
           {/* Quick Hits */}
           <section className="mb-6 pb-20">
@@ -898,7 +951,8 @@ export const AlunosView = React.memo(({ currentUser, onSelectStudent, onAssignWo
       try {
         const q = query(
           collection(db, 'users'), 
-          where('role', '==', 'student')
+          where('role', '==', 'student'),
+          where('coachId', '==', currentUser.id)
         );
         const unsubscribe = onSnapshot(q, (snap) => {
           let fetchedStudents = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })) as User[];
@@ -1363,6 +1417,7 @@ export const RankView = React.memo(({ currentUser, onSelectStudent }: { currentU
 
 export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: { currentUser: User, onLogout: () => void, onUpdateUser?: (data: Partial<User>) => void }) => {
   const [stats, setStats] = useState({ checkIns: 0, streak: 0 });
+  const [weightHistory, setWeightHistory] = useState<{date: string, weight: number}[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1370,14 +1425,25 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const qCheckIns = query(collection(db, 'checkins'), where('studentId', '==', currentUser.id));
-        const qWorkouts = query(collection(db, 'workouts'), where('studentId', '==', currentUser.id), where('status', '==', 'completed'));
+        const qCheckIns = query(collection(db, 'checkins'), where('studentId', '==', currentUser.id), orderBy('createdAt', 'desc'));
+        const qWorkouts = query(collection(db, 'workouts'), where('studentId', '==', currentUser.id), where('completed', '==', true));
         
         const [checkInSnap, workoutSnap] = await Promise.all([
           getDocs(qCheckIns),
           getDocs(qWorkouts)
         ]);
 
+        const history = checkInSnap.docs.map(doc => {
+          const data = doc.data();
+          const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
+          return {
+            date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+            weight: data.weightKg,
+            timestamp: date.getTime()
+          };
+        }).sort((a, b) => a.timestamp - b.timestamp);
+
+        setWeightHistory(history);
         setStats({
           checkIns: checkInSnap.size,
           streak: Math.min(workoutSnap.size, pointsToStreak(currentUser.points || 0)) 
@@ -1603,6 +1669,51 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
          <p className="mono text-[9px] font-black uppercase tracking-widest opacity-40 text-center">
             {remaining > 0 ? `${remaining} V-Points Restantes` : 'Protocolo Máximo Ativo'}
          </p>
+      </div>
+
+      {/* Weight Evolution Chart */}
+      <div className="w-full glass p-6 rounded-[2.5rem] border border-white/5 mb-6 relative overflow-hidden">
+         <h3 className="mono text-[10px] uppercase font-black tracking-[0.2em] opacity-40 mb-6 flex items-center justify-between">
+            <span>Evolução de Peso</span>
+            <span className="text-[8px] text-atheris-accent">{currentUser.latestWeightKg} KG ATUAL</span>
+         </h3>
+         
+         <div className="h-48 w-full -ml-4">
+            {weightHistory.length > 1 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={weightHistory}>
+                  <defs>
+                    <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#00ff66" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#00ff66" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '10px', fontFamily: 'monospace' }}
+                    itemStyle={{ color: '#00ff66' }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="weight" 
+                    stroke="#00ff66" 
+                    fillOpacity={1} 
+                    fill="url(#weightGradient)" 
+                    strokeWidth={3}
+                    dot={{ fill: '#00ff66', strokeWidth: 2, r: 4, stroke: '#000' }}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                  />
+                  <XAxis dataKey="date" hide />
+                  <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full w-full flex flex-col items-center justify-center opacity-30 text-center px-4">
+                 <Scale size={24} className="mb-2" />
+                 <p className="text-[10px] mono uppercase">Dados Insuficientes</p>
+                 <p className="text-[8px] mt-1 italic">Realize mais check-ins para gerar o mapeamento bio-evolutivo.</p>
+              </div>
+            )}
+         </div>
       </div>
 
       {/* Grid Stats Row */}

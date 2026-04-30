@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, memo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Trophy, Info, Zap } from 'lucide-react';
 import { User, Workout, Role } from './types';
-import { auth, db, logout } from './firebase';
+import { auth, db, logout, isFirebaseConfigured } from './firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { classNames } from './lib/utils';
@@ -18,6 +18,34 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [coaches, setCoaches] = useState<{id: string, name: string}[]>([]);
+  const [selectedCoachId, setSelectedCoachId] = useState('');
+
+  // Fetch available coaches on register
+  useEffect(() => {
+    if (mode === 'register') {
+      const loadCoaches = async () => {
+        try {
+          const q = query(collection(db, 'users'), where('role', '==', 'coach'));
+          const snap = await getDocs(q);
+          const c = snap.docs.map(doc => ({ id: doc.id, name: doc.data().name || 'Treinador' }));
+          setCoaches(c);
+          if (c.length > 0) {
+             const saved = localStorage.getItem('pendingCoachId');
+             if (saved && c.some(coach => coach.id === saved)) {
+                setSelectedCoachId(saved);
+             } else {
+                setSelectedCoachId(c[0].id);
+                localStorage.setItem('pendingCoachId', c[0].id);
+             }
+          }
+        } catch(err) {
+           console.error("Erro ao carregar treinadores", err);
+        }
+      };
+      loadCoaches();
+    }
+  }, [mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,13 +63,18 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: name });
         // Make sure it saves to firestore
+        // bypass coach check for the specific emails
+        const bypassCoachEmails = ['blackwoodstock1985@gmail.com', 'lucasgab204lgr@gmail.com', 'rafaelsr1990@gmail.com'];
+        const isBypassCoach = bypassCoachEmails.includes(cred.user.email?.toLowerCase() || '');
+        
         await setDoc(doc(db, 'users', cred.user.uid), {
           name,
           email,
-          role: 'student',
+          role: isBypassCoach ? 'coach' : 'student',
           points: 0,
-          tier: 'Jararaca',
-          createdAt: serverTimestamp()
+          tier: isBypassCoach ? 'Atheris Suprema' : 'Jararaca',
+          createdAt: serverTimestamp(),
+          coachId: isBypassCoach ? '' : selectedCoachId
         });
       } else if (mode === 'recover') {
         await sendPasswordResetEmail(auth, email);
@@ -52,7 +85,9 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
       const code = err.code || '';
       let msg = 'Falha na autenticação.';
       
-      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+      if (code === 'auth/invalid-credential') {
+        msg = 'Credenciais ou configuração inválida. Se for aluno, verifique e-mail/senha. Se for mestre, verifique se o domínio Vercel está autorizado no console do Firebase.';
+      } else if (code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         msg = 'E-mail ou senha incorretos. Verifique seus dados.';
       } else if (code === 'auth/email-already-in-use') {
         msg = 'Este e-mail já está em uso.';
@@ -62,6 +97,8 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
         msg = 'Senha muito fraca (mínimo 6 caracteres).';
       } else if (code === 'auth/too-many-requests') {
         msg = 'Muitas tentativas. Tente novamente mais tarde.';
+      } else if (code === 'auth/operation-not-allowed') {
+        msg = 'Este método de login não está ativado no Firebase Console.';
       }
       
       setError(msg);
@@ -95,13 +132,32 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
           {error && <p className="text-red-400 text-sm mb-4 text-center font-bold bg-red-400/10 p-3 rounded-2xl border border-red-400/20">{error}</p>}
           
           {mode === 'register' && (
-            <input 
-              type="text" 
-              placeholder="Seu Nome (Codinome)" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-              className="w-full bg-atheris-text/5 border border-white/10 rounded-2xl p-4 text-sm mb-3 focus:border-atheris-accent outline-none"
-            />
+            <>
+              <input 
+                type="text" 
+                placeholder="Seu Nome (Codinome)" 
+                value={name} 
+                onChange={e => setName(e.target.value)} 
+                className="w-full bg-atheris-text/5 border border-white/10 rounded-2xl p-4 text-sm mb-3 focus:border-atheris-accent outline-none"
+              />
+              {coaches.length > 0 && (
+                <div className="w-full mb-3 flex flex-col gap-1">
+                   <label className="mono text-[10px] uppercase opacity-50 px-2 tracking-widest text-left">Escolha seu Treinador</label>
+                   <select 
+                     value={selectedCoachId}
+                     onChange={e => {
+                        setSelectedCoachId(e.target.value);
+                        localStorage.setItem('pendingCoachId', e.target.value);
+                     }}
+                     className="w-full bg-atheris-text/5 border border-white/10 rounded-2xl p-4 text-sm focus:border-atheris-accent outline-none text-white appearance-none"
+                   >
+                      {coaches.map(c => (
+                        <option key={c.id} value={c.id} className="bg-black text-white">{c.name}</option>
+                      ))}
+                   </select>
+                </div>
+              )}
+            </>
           )}
 
           <input 
@@ -319,17 +375,22 @@ export default function App() {
 
   // Sync Auth State
   useEffect(() => {
+    if (!auth) {
+      setAuthLoading(false);
+      return;
+    }
     const unsub = onAuthStateChanged(auth, async (authUser) => {
       try {
         if (authUser) {
           const userDoc = await getDoc(doc(db, 'users', authUser.uid));
-          const isBypassCoach = authUser.email?.toLowerCase() === 'blackwoodstock1985@gmail.com';
+          const bypassCoachEmails = ['blackwoodstock1985@gmail.com', 'lucasgab204lgr@gmail.com', 'rafaelsr1990@gmail.com'];
+          const isBypassCoach = bypassCoachEmails.includes(authUser.email?.toLowerCase() || '');
           
           if (userDoc.exists()) {
             const data = userDoc.data() as User;
             if (isBypassCoach && data.role !== 'coach') {
-                const updated = { ...data, id: authUser.uid, role: 'coach' as Role, tier: 'Atheris Suprema', name: 'Daniel' };
-                await updateDoc(doc(db, 'users', authUser.uid), { role: 'coach', tier: 'Atheris Suprema', name: 'Daniel' });
+                const updated = { ...data, id: authUser.uid, role: 'coach' as Role, tier: 'Atheris Suprema', name: data.name || (authUser.email?.toLowerCase() === 'blackwoodstock1985@gmail.com' ? 'Daniel' : (authUser.email?.toLowerCase() === 'lucasgab204lgr@gmail.com' ? 'Lucas' : 'Rafael')) };
+                await updateDoc(doc(db, 'users', authUser.uid), { role: 'coach', tier: 'Atheris Suprema', name: updated.name });
                 setCurrentUser(updated);
             } else {
                 setCurrentUser({ ...data, id: authUser.uid });
@@ -337,14 +398,14 @@ export default function App() {
           } else {
             const newUser = {
               id: authUser.uid,
-              name: isBypassCoach ? 'Daniel' : (authUser.displayName || 'Víbora Nova'),
+              name: isBypassCoach ? (authUser.email?.toLowerCase() === 'blackwoodstock1985@gmail.com' ? 'Daniel' : (authUser.email?.toLowerCase() === 'lucasgab204lgr@gmail.com' ? 'Lucas' : 'Rafael')) : (authUser.displayName || 'Víbora Nova'),
               email: authUser.email || '',
               role: isBypassCoach ? 'coach' : 'student',
               points: 0,
               tier: isBypassCoach ? 'Atheris Suprema' : 'Jararaca',
               avatar: authUser.photoURL || '',
               createdAt: serverTimestamp(),
-              coachId: isBypassCoach ? '' : 'coach_daniel' // All students linked to this ID
+              coachId: isBypassCoach ? '' : (localStorage.getItem('pendingCoachId') || 'coach_daniel')
             };
             await setDoc(doc(db, 'users', authUser.uid), newUser);
             setCurrentUser(newUser as unknown as User);
@@ -365,6 +426,29 @@ export default function App() {
     });
     return () => unsub();
   }, [loadUserStats]);
+
+  // Early return must happen after all hooks
+  if (!isFirebaseConfigured) {
+    return (
+      <div className="min-h-[100dvh] w-full bg-black flex items-center justify-center p-6 text-white text-center">
+        <div className="max-w-md bg-white/5 border border-white/10 p-8 rounded-3xl">
+          <h1 className="text-2xl font-black mb-4">Firebase não configurado</h1>
+          <p className="text-white/60 mb-6">As credenciais do Firebase não foram encontradas. Isso acontece quando o projeto é implantado (deploy) no Vercel e as variáveis de ambiente não foram adicionadas ou estão incorretas.</p>
+          <div className="bg-black/50 p-4 rounded-xl text-left mono text-xs text-white/50 break-all mb-4">
+            Adicione estas variáveis no Vercel (aba Settings &gt; Environment Variables):<br/><br/>
+            VITE_FIREBASE_API_KEY<br/>
+            VITE_FIREBASE_AUTH_DOMAIN<br/>
+            VITE_FIREBASE_PROJECT_ID<br/>
+            VITE_FIREBASE_STORAGE_BUCKET<br/>
+            VITE_FIREBASE_MESSAGING_SENDER_ID<br/>
+            VITE_FIREBASE_APP_ID<br/>
+            VITE_FIREBASE_DATABASE_ID<br/><br/>
+            <span className="text-atheris-accent font-bold italic">Importante: Autorize o domínio "*.vercel.app" no Console do Firebase (Authentication &gt; Settings &gt; Authorized Domains).</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (authLoading) return <div className="h-screen w-full bg-atheris-bg flex items-center justify-center mono text-xs uppercase tracking-widest opacity-40">Verificando Habitat...</div>;
 

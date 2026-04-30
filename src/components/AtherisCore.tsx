@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Role } from '../types';
-import { LayoutGrid, Users, Dumbbell, Trophy, Info, Zap, ChevronLeft, LogOut, Image as ImageIcon, MessageSquare, User } from 'lucide-react';
+import { LayoutGrid, Users, Dumbbell, Trophy, Info, Zap, ChevronLeft, LogOut, Image as ImageIcon, MessageSquare, User as UserIcon } from 'lucide-react';
 
 export const BackgroundBlobs = React.memo(() => (
   <>
@@ -236,7 +236,7 @@ export const TabBar = React.memo(({ role, activeTab, setActiveTab }: {
             onClick={() => setActiveTab('perfil')}
             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'perfil' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
           >
-            <User size={activeTab === 'perfil' ? 24 : 20} strokeWidth={activeTab === 'perfil' ? 2.5 : 2} />
+            <UserIcon size={activeTab === 'perfil' ? 24 : 20} strokeWidth={activeTab === 'perfil' ? 2.5 : 2} />
             <span className="text-[10px] mono font-bold uppercase tracking-widest">Perfil</span>
           </button>
         </>

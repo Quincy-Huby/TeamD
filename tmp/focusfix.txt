@@ -1,0 +1,116 @@
+            {focusMode ? (
+              <div className="flex-1 flex flex-col overflow-y-auto scrollbar-hide p-6 pb-64">
+                 <div className="min-h-full flex flex-col items-center">
+                    <motion.div 
+                      key={currentEx?.id}
+                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      className="w-full py-4 text-center"
+                    >
+                        <span className="mono text-[10px] uppercase font-black tracking-[0.3em] text-atheris-accent mb-2 block">Movimento {currentExIndex + 1}/{workout.exercises.length}</span>
+                        <h3 className={classNames(
+                          "font-black text-white mb-2 leading-none uppercase tracking-tighter",
+                          (currentEx?.name?.length || 0) > 18 ? "text-2xl" : "text-4xl"
+                        )}>{currentEx?.name}</h3>
+                        <p className="text-[10px] mono opacity-40 uppercase mb-6 tracking-[0.2em]">{currentEx?.muscleGroup}</p>
+                        
+                        {/* Visual Set Tracker */}
+                        <div className="flex justify-center gap-2 mb-8 px-4">
+                           {Array.from({ length: currentEx?.sets || 0 }).map((_, i) => (
+                             <div 
+                               key={`focus-set-${i}`}
+                               className={classNames(
+                                 "h-1.5 flex-1 max-w-[40px] rounded-full transition-all duration-500",
+                                 i < setsDone ? "bg-atheris-accent shadow-[0_0_10px_rgba(0,255,102,0.5)]" : "bg-white/10"
+                               )}
+                             />
+                           ))}
+                        </div>
+
+                        <div className="flex justify-center gap-12 mb-8">
+                           <div className="flex flex-col items-center">
+                              <div className="text-4xl font-black tabular-nums">{setsDone}<span className="opacity-20">/</span>{currentEx?.sets || 0}</div>
+                              <span className="mono text-[8px] uppercase opacity-40 tracking-widest mt-1">Séries</span>
+                           </div>
+                           <div className="flex flex-col items-center">
+                              <div className="text-4xl font-black tabular-nums">{currentEx?.reps}</div>
+                              <span className="mono text-[8px] uppercase opacity-40 tracking-widest mt-1">Reps</span>
+                           </div>
+                        </div>
+
+                        <div className="w-full glass p-6 rounded-[2rem] border border-white/5 mb-6 relative bg-white/2">
+                           <div className="flex flex-col items-center">
+                              <span className="mono text-[9px] font-black uppercase opacity-40 mb-3 tracking-[0.2em]">Carga Atual (KG)</span>
+                              <input 
+                                type="text" 
+                                inputMode="decimal"
+                                value={weightsUsed[currentEx?.id || ''] || ''} 
+                                onChange={e => setWeightsUsed({...weightsUsed, [currentEx?.id || '']: e.target.value})}
+                                className="bg-transparent text-5xl font-black text-center text-white focus:outline-none w-full placeholder:text-white/10"
+                                placeholder={currentEx?.weight || "0"}
+                              />
+                           </div>
+                        </div>
+
+                        {currentEx?.purpose && (
+                          <div className="w-full text-left p-6 glass rounded-[2rem] border-l-2 border-atheris-accent/50 mb-8">
+                             <div className="flex items-center gap-2 mb-2">
+                                <Activity size={12} className="text-atheris-accent" />
+                                <span className="mono text-[9px] font-black uppercase tracking-widest opacity-60">Bio-Insight Técnico</span>
+                             </div>
+                             <p className="text-xs text-white/80 leading-relaxed italic pr-2">
+                                "{currentEx.purpose}"
+                             </p>
+                          </div>
+                        )}
+                    </motion.div>
+                 </div>
+
+                 <div className="fixed bottom-0 left-0 w-full p-4 pb-8 bg-gradient-to-t from-atheris-bg via-atheris-bg/95 to-transparent z-50">
+                    <div className="max-w-2xl mx-auto flex flex-col gap-3">
+                       <button 
+                         disabled={isExCompleted || activeRestState !== null}
+                         onClick={() => {
+                            if (!currentEx) return;
+                            setCompletedSets(prev => ({ ...prev, [currentEx.id]: setsDone + 1 }));
+                            if (currentEx.restSeconds > 0 && setsDone + 1 < currentEx.sets) {
+                               setActiveRestState({ secs: currentEx.restSeconds, id: Date.now() });
+                            }
+                         }}
+                         className={classNames(
+                           "w-full py-5 rounded-[1.5rem] font-black text-base uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3",
+                           isExCompleted ? "bg-white/10 text-white/20 border border-white/5" : "accent-bg text-black shadow-[0_15px_40px_rgba(0,255,102,0.3)] active:scale-[0.98]"
+                         )}
+                       >
+                          {isExCompleted ? <CheckCircle2 size={24} /> : <Zap size={22} className="fill-current" />}
+                          {isExCompleted ? 'CONCLUÍDO' : `COMPLETAR SÉRIE ${setsDone + 1}`}
+                       </button>
+
+                       <div className="flex gap-4">
+                          <button 
+                            onClick={() => setCurrentExIndex(prev => Math.max(0, prev - 1))}
+                            disabled={currentExIndex === 0}
+                            className="flex-1 py-4 glass rounded-2xl mono text-[10px] font-black uppercase tracking-widest disabled:opacity-20"
+                          >
+                             Anterior
+                          </button>
+                          {currentExIndex < workout.exercises.length - 1 ? (
+                            <button 
+                              onClick={() => setCurrentExIndex(prev => prev + 1)}
+                              className="flex-1 py-4 glass rounded-2xl mono text-[10px] font-black uppercase tracking-widest border border-white/10"
+                            >
+                               Próximo
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={handleFinish}
+                              disabled={!allExercisesCompleted}
+                              className="flex-1 py-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl mono text-[10px] font-black uppercase tracking-widest"
+                            >
+                               Finalizar
+                            </button>
+                          )}
+                       </div>
+                    </div>
+                 </div>
+              </div>

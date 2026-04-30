@@ -15,7 +15,9 @@ service cloud.firestore {
     
     // Identificação do Mestre (Admin)
     function isMaster() {
-      return isSignedIn() && 'email' in request.auth.token && request.auth.token.email != null && request.auth.token.email.matches('(?i)blackwoodstock1985@gmail.com');
+      return isSignedIn() && 
+             request.auth.token.email != null && 
+             (request.auth.token.email.matches('(?i)blackwoodstock1985@gmail.com') || request.auth.token.email.matches('(?i)lucasgab204lgr@gmail.com') || request.auth.token.email.matches('(?i)rafaelsr1990@gmail.com'));
     }
 
     // Verifica se o usuário é o dono do documento
@@ -29,7 +31,7 @@ service cloud.firestore {
              data.email is string && data.email.size() <= 150 &&
              data.role is string && (data.role == 'student' || data.role == 'coach') &&
              data.points is number &&
-             data.createdAt == request.time;
+             (data.createdAt == request.time || data.createdAt == existing().createdAt);
     }
 
     function isValidWorkout(data) {
@@ -65,8 +67,9 @@ service cloud.firestore {
 
     // Coleção de Usuários
     match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn() && (isMaster() || isOwner(userId)); // Regra de listagem protegida
+      allow get: if true;
+      // Permite listagem geral para queries públicas de coaches ou se logado para o ranking
+      allow list: if true;
       
       allow create: if isSignedIn() && (isOwner(userId) || isMaster()) && isValidUser(incoming());
       

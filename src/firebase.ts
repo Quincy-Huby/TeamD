@@ -8,28 +8,48 @@ const localConfig = configs['../firebase-applet-config.json'] ? (configs['../fir
 
 // Mescla o config do arquivo com possíveis variáveis de ambiente (Vercel)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || localConfig.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || localConfig.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || localConfig.projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || localConfig.storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || localConfig.messagingSenderId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || localConfig.appId,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || localConfig.firestoreDatabaseId || "(default)"
+  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || localConfig.apiKey || "",
+  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || localConfig.authDomain || "",
+  projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || localConfig.projectId || "",
+  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || localConfig.storageBucket || "",
+  messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || localConfig.messagingSenderId || "",
+  appId: (import.meta.env.VITE_FIREBASE_APP_ID as string) || localConfig.appId || "",
+  firestoreDatabaseId: (import.meta.env.VITE_FIREBASE_DATABASE_ID as string) || localConfig.firestoreDatabaseId || "(default)"
 };
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)");
-
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code == 'failed-precondition') {
-      console.warn("Multiple tabs open, persistence can only be enabled in one tab at a a time.");
-  } else if (err.code == 'unimplemented') {
-      console.warn("The current browser does not support all of the features required to enable persistence");
-  }
+console.log("Firebase Config Initialization:", {
+  hasApiKey: !!firebaseConfig.apiKey,
+  projectId: firebaseConfig.projectId,
+  source: (import.meta.env.VITE_FIREBASE_API_KEY) ? "Env Vars" : (localConfig.apiKey ? "Local Config" : "None")
 });
 
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+let app, db: any, auth: any, googleProvider: any;
+let isFirebaseConfigured = false;
+
+try {
+  if (!firebaseConfig.apiKey) {
+    throw new Error("Chaves do Firebase ausentes. Verifique suas variáveis de ambiente no Vercel ou o arquivo firebase-applet-config.json.");
+  }
+  
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)");
+
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code == 'failed-precondition') {
+        console.warn("Multiple tabs open, persistence can only be enabled in one tab at a a time.");
+    } else if (err.code == 'unimplemented') {
+        console.warn("The current browser does not support all of the features required to enable persistence");
+    }
+  });
+
+  auth = getAuth(app);
+  googleProvider = new GoogleAuthProvider();
+  isFirebaseConfigured = true;
+} catch (error) {
+  console.error("FIREBASE INIT ERROR:", error);
+}
+
+export { app, db, auth, googleProvider, isFirebaseConfigured };
 
 export async function testConnection() {
   try {
