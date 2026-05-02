@@ -118,12 +118,16 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
       console.error(err);
       if (err.code === 'auth/popup-closed-by-user') {
         // Just silent
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('O acesso via pop-up foi bloqueado por este navegador mobile. Por favor, habilite pop-ups ou use e-mail e senha.');
       } else if (err.code === 'auth/invalid-credential') {
-        setError('Configuração do Google no Firebase está incompleta ou inválida. Verifique o "authDomain".');
+        setError('Configuração do Google no Firebase está incompleta. Verifique o "authDomain" no Console Atheris.');
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('O login com Google não está ativado no seu projeto Firebase.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('Este domínio não está autorizado no Firebase. Verifique Authentication > Settings > Authorized domains.');
       } else {
-        setError('Erro ao acessar com Google. ' + (err.message || 'Erro desconhecido.'));
+        setError('Erro ao acessar com Google: ' + (err.code || 'Erro desconhecido.'));
       }
     } finally {
       setLoading(false);

@@ -33,66 +33,75 @@ export const SnakeEye: React.FC<SnakeEyeProps> = ({ size = 24, className = "", s
       fillOpacity="0.03"
     />
 
-    {/* Íris Orgânica com Movimento e Pulsação */}
+    {/* Íris Orgânica com Movimento e Pulsação - Suavizada */}
     <motion.g
       mask="url(#eye-mask)"
       animate={{ 
-        x: [-0.8, 0.8, -0.4, 0.6, 0], 
-        y: [-0.4, 0.4, 0.2, -0.3, 0] 
+        x: [-0.3, 0.3, -0.1, 0.2, 0], 
+        y: [-0.1, 0.1, 0.05, -0.05, 0] 
       }}
       transition={{ 
-        duration: 8, 
+        duration: 12, 
         repeat: Infinity, 
-        ease: "easeInOut",
-        times: [0, 0.2, 0.5, 0.8, 1] 
+        ease: "easeInOut"
       }}
     >
-      {/* Base da Íris */}
+      {/* Base da Íris com Gradiente Simulado */}
       <ellipse 
         cx="12" 
         cy="13" 
         rx="6.5" 
         ry="5.5" 
         fill="currentColor" 
-        fillOpacity="0.18" 
+        fillOpacity="0.22" 
+      />
+      
+      {/* Camada de Profundidade da Íris */}
+      <ellipse 
+        cx="12" 
+        cy="13" 
+        rx="4.5" 
+        ry="3.5" 
+        fill="black" 
+        fillOpacity="0.1" 
       />
       
       {/* Textura de Fibras Radiais (Viper Texture) */}
-      <g opacity="0.5">
+      <g opacity="0.4">
         {[...Array(16)].map((_, i) => (
           <motion.line
             key={i}
             x1="12"
             y1="13"
-            x2={12 + Math.cos(i * (Math.PI / 8)) * 5.5}
-            y2={13 + Math.sin(i * (Math.PI / 8)) * 4.5}
+            x2={12 + Math.cos(i * (Math.PI / 8)) * 6}
+            y2={13 + Math.sin(i * (Math.PI / 8)) * 5}
             stroke="currentColor"
-            strokeWidth="0.4"
-            animate={{ opacity: [0.3, 0.7, 0.3] }}
-            transition={{ duration: 3 + Math.random() * 2, repeat: Infinity }}
+            strokeWidth="0.3"
+            animate={{ opacity: [0.2, 0.5, 0.2] }}
+            transition={{ duration: 4 + i * 0.1, repeat: Infinity }}
           />
         ))}
       </g>
 
-      {/* Pupila de Fenda Vertical (Predatory Dilation) */}
+      {/* Pupila de Fenda Vertical (Viper Slit) - Dilação Orgânica */}
       <motion.path 
-        d="M12 7.5C12.6 11 12.6 15 12 18.5C11.4 15 11.4 11 12 7.5Z" 
+        d="M12 8C12.3 11 12.3 15 12 18C11.7 15 11.7 11 12 8Z" 
         fill="currentColor" 
         animate={{ 
-          scaleX: [1, 1.8, 0.6, 1.3, 1],
-          opacity: [1, 0.8, 1, 0.9, 1]
+          scaleX: [1, 1.3, 0.8, 1.1, 1],
+          opacity: [1, 0.85, 1, 0.9, 1]
         }}
         transition={{ 
-          duration: 10, 
+          duration: 15, 
           repeat: Infinity, 
-          ease: "easeInOut" 
+          ease: "linear" 
         }}
         style={{ originX: "12px", originY: "13px" }}
       />
       
-      {/* Reflexos de Luz (Specularity) */}
-      <circle cx="14.5" cy="11.2" r="0.8" fill="white" fillOpacity="0.6" />
-      <circle cx="13.5" cy="12.2" r="0.4" fill="white" fillOpacity="0.3" />
+      {/* Reflexos de Luz (Specularity) - Mais realistas */}
+      <circle cx="14.5" cy="11.2" r="0.9" fill="white" fillOpacity="0.5" />
+      <circle cx="13.2" cy="12.2" r="0.4" fill="white" fillOpacity="0.25" />
     </motion.g>
 
     {/* Contorno Principal */}
