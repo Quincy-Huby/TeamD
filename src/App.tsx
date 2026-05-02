@@ -84,7 +84,7 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
     } catch (err: any) {
       console.error(err);
       const code = err.code || '';
-      let msg = 'Falha na autenticação.';
+      let msg = 'Falha na autenticação. (Código: ' + (code || 'desconhecido') + ')';
       
       if (code === 'auth/invalid-credential') {
         msg = 'Credenciais inválidas. Verifique seu e-mail e senha. Se você usa Google, tente o botão abaixo.';
@@ -100,6 +100,8 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
         msg = 'Muitas tentativas. Tente novamente mais tarde.';
       } else if (code === 'auth/operation-not-allowed') {
         msg = 'Este método de login (E-mail/Senha) não está ativado no Firebase Console.';
+      } else if (code === 'auth/network-request-failed') {
+        msg = 'Erro de rede. Verifique sua conexão com a internet.';
       }
       
       setError(msg);
@@ -394,6 +396,18 @@ export default function App() {
       setAuthLoading(false);
       return;
     }
+
+    const verifyRedirect = async () => {
+      try {
+        const { checkRedirectResult } = await import('./firebase');
+        await checkRedirectResult();
+      } catch (err: any) {
+        console.error("Redirect error", err);
+        addNotification("Erro no Login", "Falha ao completar login via Google: " + err.message, "error");
+      }
+    };
+    verifyRedirect();
+
     const unsub = onAuthStateChanged(auth, async (authUser) => {
       try {
         if (authUser) {
