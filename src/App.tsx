@@ -132,9 +132,9 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 z-10 w-full max-w-sm mx-auto">
-       <div className="w-24 h-24 mb-6 rounded-full border border-white/10 flex items-center justify-center bg-atheris-text/5 relative overflow-hidden">
+       <div className="w-28 h-28 mb-8 rounded-full border border-white/10 flex items-center justify-center bg-atheris-text/5 relative overflow-hidden ring-4 ring-atheris-accent/5">
          <div className="absolute inset-0 bg-gradient-to-tr from-atheris-accent/20 to-transparent opacity-50"></div>
-         <SnakeEye size={40} className="text-atheris-accent" />
+         <SnakeEye size={64} className="text-atheris-accent drop-shadow-[0_0_15px_rgba(0,255,102,0.4)]" />
        </div>
        <h1 className="text-5xl font-black text-atheris-text tracking-tighter mb-4 text-center">ATHERIS</h1>
        <p className="text-atheris-accent mono mb-8">Por favor, acesse o habitat.</p>

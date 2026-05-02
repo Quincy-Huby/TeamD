@@ -16,74 +16,124 @@ export const SnakeEye: React.FC<SnakeEyeProps> = ({ size = 24, className = "", s
     xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
-    {/* Sombra de Pálpebra / Brow (Twitch animation) */}
-    <motion.path 
-      d="M4 10C7 7.5 17 7.5 20 10" 
-      stroke="currentColor" 
-      strokeWidth="1.5" 
-      strokeLinecap="round" 
-      opacity="0.8"
-      animate={{ d: ["M4 10C7 7.5 17 7.5 20 10", "M4 9.5C7 7 17 7 20 9.5", "M4 10C7 7.5 17 7.5 20 10"] }}
-      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+    {/* Definições para Mascaramento e Filtros */}
+    <defs>
+      <mask id="eye-mask">
+        <path d="M2.5 13C2.5 13 6 6 12 6C18 6 21.5 13 21.5 13C21.5 13 18 20 12 20C6 20 2.5 13 2.5 13Z" fill="white" />
+      </mask>
+    </defs>
+
+    {/* Fundo do Olho (Esclera/Deep Iris) */}
+    <ellipse 
+      cx="12" 
+      cy="13" 
+      rx="8" 
+      ry="7" 
+      fill="currentColor" 
+      fillOpacity="0.03"
     />
 
-    {/* Contorno Externo (Víbora) */}
+    {/* Íris Orgânica com Movimento e Pulsação */}
+    <motion.g
+      mask="url(#eye-mask)"
+      animate={{ 
+        x: [-0.8, 0.8, -0.4, 0.6, 0], 
+        y: [-0.4, 0.4, 0.2, -0.3, 0] 
+      }}
+      transition={{ 
+        duration: 8, 
+        repeat: Infinity, 
+        ease: "easeInOut",
+        times: [0, 0.2, 0.5, 0.8, 1] 
+      }}
+    >
+      {/* Base da Íris */}
+      <ellipse 
+        cx="12" 
+        cy="13" 
+        rx="6.5" 
+        ry="5.5" 
+        fill="currentColor" 
+        fillOpacity="0.18" 
+      />
+      
+      {/* Textura de Fibras Radiais (Viper Texture) */}
+      <g opacity="0.5">
+        {[...Array(16)].map((_, i) => (
+          <motion.line
+            key={i}
+            x1="12"
+            y1="13"
+            x2={12 + Math.cos(i * (Math.PI / 8)) * 5.5}
+            y2={13 + Math.sin(i * (Math.PI / 8)) * 4.5}
+            stroke="currentColor"
+            strokeWidth="0.4"
+            animate={{ opacity: [0.3, 0.7, 0.3] }}
+            transition={{ duration: 3 + Math.random() * 2, repeat: Infinity }}
+          />
+        ))}
+      </g>
+
+      {/* Pupila de Fenda Vertical (Predatory Dilation) */}
+      <motion.path 
+        d="M12 7.5C12.6 11 12.6 15 12 18.5C11.4 15 11.4 11 12 7.5Z" 
+        fill="currentColor" 
+        animate={{ 
+          scaleX: [1, 1.8, 0.6, 1.3, 1],
+          opacity: [1, 0.8, 1, 0.9, 1]
+        }}
+        transition={{ 
+          duration: 10, 
+          repeat: Infinity, 
+          ease: "easeInOut" 
+        }}
+        style={{ originX: "12px", originY: "13px" }}
+      />
+      
+      {/* Reflexos de Luz (Specularity) */}
+      <circle cx="14.5" cy="11.2" r="0.8" fill="white" fillOpacity="0.6" />
+      <circle cx="13.5" cy="12.2" r="0.4" fill="white" fillOpacity="0.3" />
+    </motion.g>
+
+    {/* Contorno Principal */}
     <path 
-      d="M3 13C3 13 6 7 12 7C18 7 21 13 21 13C21 13 18 19 12 19C6 19 3 13 3 13Z" 
+      d="M2.5 13C2.5 13 6 6 12 6C18 6 21.5 13 21.5 13C21.5 13 18 20 12 20C6 20 2.5 13 2.5 13Z" 
       stroke="currentColor" 
       strokeWidth={strokeWidth} 
       strokeLinecap="round" 
       strokeLinejoin="round" 
     />
     
-    {/* Iris & Pupil Assembly (Movement animation) */}
-    <motion.g
-      animate={{ x: [-0.5, 0.5, -0.2, 0.3, 0], y: [-0.2, 0.2, 0.1, -0.1, 0] }}
-      transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-    >
-      {/* Íris Orgânica */}
-      <ellipse 
-        cx="12" 
-        cy="13" 
-        rx="5.5" 
-        ry="4.5" 
-        fill="currentColor" 
-        fillOpacity="0.15" 
-      />
-      
-      {/* Textura da Íris (Fibras Radiais) */}
-      <g opacity="0.4">
-        <path d="M12 9V10" stroke="currentColor" strokeWidth="0.5" />
-        <path d="M12 16V17" stroke="currentColor" strokeWidth="0.5" />
-        <path d="M9 13H8" stroke="currentColor" strokeWidth="0.5" />
-        <path d="M16 13H15" stroke="currentColor" strokeWidth="0.5" />
-        <path d="M10 10.5L9 9.5" stroke="currentColor" strokeWidth="0.5" />
-        <path d="M15 15.5L14 14.5" stroke="currentColor" strokeWidth="0.5" />
-        <path d="M15 10.5L14 11.5" stroke="currentColor" strokeWidth="0.5" />
-        <path d="M10 15.5L9 14.5" stroke="currentColor" strokeWidth="0.5" />
-      </g>
+    {/* Animação de Piscar (Blink) - Pálpebra Superior */}
+    <motion.path
+      d="M2.5 13C2.5 13 6 6 12 6C18 6 21.5 13 21.5 13"
+      stroke="currentColor"
+      strokeWidth={strokeWidth + 0.5}
+      fill="none"
+      animate={{ 
+        d: [
+          "M2.5 13C2.5 13 6 6 12 6C18 6 21.5 13 21.5 13", // Aberto
+          "M2.5 13C2.5 13 6 6 12 6C18 6 21.5 13 21.5 13", // Aberto
+          "M2.5 13C2.5 13 6 13 12 13C18 13 21.5 13 21.5 13", // Fechado
+          "M2.5 13C2.5 13 6 6 12 6C18 6 21.5 13 21.5 13"  // Aberto
+        ]
+      }}
+      transition={{ 
+        duration: 0.25, 
+        repeat: Infinity, 
+        repeatDelay: 4, 
+        ease: "easeInOut",
+        times: [0, 0.1, 0.15, 0.25]
+      }}
+    />
 
-      {/* Pupila de Fenda (Viper Slit) - Dilation animation */}
-      <motion.path 
-        d="M12 8.5C12.3 11 12.3 15 12 17.5C11.7 15 11.7 11 12 8.5Z" 
-        fill="currentColor" 
-        animate={{ scaleX: [1, 1.4, 0.8, 1], opacity: [1, 0.9, 1] }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-        style={{ originX: "12px", originY: "13px" }}
-      />
-      
-      {/* Reflexos de Luz (Specularity) */}
-      <ellipse cx="14.5" cy="11.5" rx="0.8" ry="1.2" fill="white" fillOpacity="0.5" transform="rotate(15, 14.5, 11.5)" />
-      <circle cx="13.5" cy="12.5" r="0.4" fill="white" fillOpacity="0.3" />
-    </motion.g>
-    
-    {/* Detalhe de Escama Inferior */}
+    {/* Sombra de Brow (Efeito Agressivo) */}
     <path 
-      d="M7 17.5C10 18.5 14 18.5 17 17.5" 
-      stroke="currentColor" 
-      strokeWidth="0.5" 
-      strokeLinecap="round" 
-      opacity="0.5"
+      d="M4 8.5C7 6 17 6 20 8.5" 
+      stroke="black" 
+      strokeWidth="1.5" 
+      opacity="0.15" 
+      strokeLinecap="round"
     />
   </svg>
 );
