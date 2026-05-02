@@ -102,6 +102,8 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
         msg = 'Este método de login (E-mail/Senha) não está ativado no Firebase Console.';
       } else if (code === 'auth/network-request-failed') {
         msg = 'Erro de rede. Verifique sua conexão com a internet.';
+      } else if (code.includes('api-key-not-valid')) {
+        msg = 'Erro de API Key do Firebase. Se você publicou na Vercel, adicione VITE_FIREBASE_API_KEY no painel da Vercel e DEPOIS gere um novo Deploy (Redeploy).';
       }
       
       setError(msg);
@@ -128,6 +130,8 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
         setError('O login com Google não está ativado no seu projeto Firebase.');
       } else if (err.code === 'auth/unauthorized-domain') {
         setError('Este domínio não está autorizado no Firebase. Verifique Authentication > Settings > Authorized domains.');
+      } else if (err.code?.includes('api-key-not-valid')) {
+        setError('A API Key do Firebase não é válida. Configure as variáveis de ambiente VITE_FIREBASE_* no Vercel (aba Settings > Environment Variables) e **Gere um Novo Deploy**.');
       } else {
         setError('Erro ao acessar com Google: ' + (err.code || 'Erro desconhecido.'));
       }
