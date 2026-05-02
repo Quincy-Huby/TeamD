@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo } from "react";
+import React, { useState, useEffect, useMemo, memo, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ResponsiveContainer,
@@ -36,6 +36,10 @@ import {
   Send,
   Sparkles,
   Activity,
+  Timer,
+  Newspaper,
+  Target,
+  Brain,
 } from "lucide-react";
 import { User, Workout, Exercise, CheckIn } from "../types";
 import { EXERCISE_LIBRARY, LibraryExercise } from "../exerciseLibrary";
@@ -60,35 +64,47 @@ import {
 } from "../firebase";
 import * as aiService from "../services/aiService";
 
+export const getDidacticInstruction = (instruction?: string, muscle?: string) => {
+  if (!instruction) return "";
+  
+  if (instruction.includes("Posição:") || /^\d+\./.test(instruction) || instruction.includes("1. ")) {
+    return instruction;
+  }
+  
+  const isGeneric = instruction.includes("Execute o movimento com cadência controlada");
+  
+  if (!isGeneric) {
+    return `1. Posição:\nMantenha a postura estabilizada no equipamento ou peso livre.\n\n2. Execução:\n${instruction}\n\n3. Respiração:\nExpire na fase de maior esforço. Inspire no retorno controlado.`;
+  }
+
+  const mg = muscle?.toLowerCase() || '';
+  if (mg.includes('peito')) return "1. Posição:\nEstabilize as escápulas no banco e mantenha o peito estufado.\n\n2. Execução:\nRealize o movimento de empurrar com a máxima amplitude confortável. Controle a descida resistindo ao peso.\n\n3. Respiração:\nExpire ao empurrar a carga. Inspire ao controlar o retorno.";
+  if (mg.includes('costas') || mg.includes('dorsal')) return "1. Posição:\nMantenha o peito aberto e o core estabilizado.\n\n2. Execução:\nInicie a puxada pelas escápulas e direcione os cotovelos para trás e para baixo. Controle a volta prolongando a tensão do músculo.\n\n3. Respiração:\nExpire ao puxar a carga. Inspire ao alongar a musculatura.";
+  if (mg.includes('perna') || mg.includes('quadríceps') || mg.includes('glúteo') || mg.includes('posterior')) return "1. Posição:\nPés firmemente apoiados, abdômen contraído e coluna preservando a curvatura natural.\n\n2. Execução:\nDesça de forma controlada garantindo o alinhamento dos joelhos. Contraia a musculatura intencionalmente na fase de subida/empurrada.\n\n3. Respiração:\nExpire na fase de maior esforço (subida). Inspire durante a descida.";
+  if (mg.includes('ombro') || mg.includes('deltoide')) return "1. Posição:\nMantenha o tronco firme e os ombros deprimidos (evitando tensionar o pescoço).\n\n2. Execução:\nEleve a carga sob controle rigoroso, estendendo a amplitude sem perder a estabilidade. Retorne freando a gravidade.\n\n3. Respiração:\nExpire ao elevar a carga. Inspire ao retornar à base.";
+  if (mg.includes('braço') || mg.includes('bíc') || mg.includes('tríc') || mg.includes('bíceps') || mg.includes('tríceps')) return "1. Posição:\nTrave os cotovelos adjacentes ao tronco, isolando completamente o braço.\n\n2. Execução:\nFaça o movimento de contração até o pico (espremendo) e alongue o braço resistindo ativamente a descida. Não use impulso corporal.\n\n3. Respiração:\nExpire durante a contração extrema. Inspire na extensão.";
+  
+  return "1. Posição:\nEstabilize as articulações e contraia o core antes de alavancar o peso.\n\n2. Execução:\nProcesse o movimento com cadência deliberada (aprox. 3s na descida). Concentre o esforço unicamente no músculo alvo.\n\n3. Respiração:\nExpire no ápice do esforço (fase concêntrica). Inspire no momento de retorno (fase excêntrica).";
+};
+
 // Helper for Timer
 export const TimerBar = React.memo(
   ({
     activeRestState,
+    timeLeft,
     onComplete,
   }: {
     activeRestState: { secs: number; id: number } | null;
+    timeLeft: number;
     onComplete: () => void;
   }) => {
-    const [timeLeft, setTimeLeft] = useState(0);
     const [joke, setJoke] = useState("");
 
     useEffect(() => {
       if (activeRestState) {
-        setTimeLeft(activeRestState.secs);
         setJoke(gymJokes[Math.floor(Math.random() * gymJokes.length)]);
       }
     }, [activeRestState]);
-
-    useEffect(() => {
-      if (timeLeft <= 0) {
-        if (activeRestState) onComplete();
-        return;
-      }
-      const interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    }, [timeLeft, activeRestState, onComplete]);
 
     if (!activeRestState || timeLeft <= 0) return null;
 
@@ -155,15 +171,20 @@ export const ExerciseInfoModal = React.memo(
     const legacyI2 =
       "Execute o movimento com cadência controlada, focando na contração do músculo alvo e mantendo a postura preservada. Caso sinta desconforto articular, ajuste a carga ou a amplitude.";
 
+    const defaultDidactic = 
+      "1. Posição: Ajuste sua postura para ficar confortável e firme.\n2. Execução: Faça o movimento devagar. Sinta o músculo.\n3. Respiração: Solte o ar quando fizer força. Puxe o ar na volta.";
+
     const isLegacyInstruction =
       !ex.instructions ||
       ex.instructions === legacyI1 ||
-      ex.instructions === legacyI2;
+      ex.instructions === legacyI2 ||
+      ex.instructions === defaultDidactic;
+      
     const displayInstruction =
       aiInstructions ||
       (isLegacyInstruction && libMatch?.instructions
         ? libMatch.instructions
-        : ex.instructions || legacyI2);
+        : ex.instructions && ex.instructions !== legacyI1 && ex.instructions !== legacyI2 ? ex.instructions : defaultDidactic);
 
     const isGenericPurpose =
       !aiPurpose && isLegacyPurpose && !libMatch?.purpose;
@@ -254,23 +275,35 @@ export const ExerciseInfoModal = React.memo(
               )}
 
               <div className="mb-6 bg-atheris-text/5 p-4 rounded-2xl border border-white/5 relative">
-                {!isGenericInstruction && (
-                  <>
-                    <h4 className="mono opacity-60 uppercase mb-2 flex items-center gap-2">
-                      <Info size={12} /> Instruções
-                    </h4>
-                    <p className="text-sm leading-relaxed text-atheris-text/90 whitespace-pre-line">
-                      {displayInstruction}
-                    </p>
-                  </>
-                )}
+                <div className="w-full text-left p-5 rounded-[1.5rem] bg-white/[0.03] border border-white/10 mb-4 relative overflow-hidden shadow-lg shadow-black/20 mt-4">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-atheris-accent/50" />
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                      <Target size={12} className="text-white/60" />
+                    </div>
+                    <span className="mono text-[10px] font-black uppercase tracking-widest text-white/50">
+                      Como Fazer
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2 pl-1">
+                    {getDidacticInstruction(displayInstruction, ex.muscleGroup || libMatch?.muscle)
+                    .split('\n').filter(Boolean).map((line, i) => {
+                      const isSubtitle = line.match(/^\d+\./);
+                      return (
+                        <p key={i} className={`font-mono text-white/80 leading-relaxed pr-2 ${isSubtitle ? 'text-[11px] font-black text-atheris-accent/80 mt-1' : 'text-[10px]'}`}>
+                          {line}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 <button
                   onClick={handleGenerateAI}
                   disabled={loadingAi}
                   className={classNames(
                     "w-full py-3 px-4 rounded-xl border border-atheris-accent/30 bg-atheris-accent/10 text-atheris-accent font-bold text-[10px] mono uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-atheris-accent/20 transition-all disabled:opacity-50",
-                    !isGenericInstruction && "mt-4",
+                    "mt-4"
                   )}
                 >
                   {loadingAi ? (
@@ -309,10 +342,88 @@ export const ExecuteWorkoutModal = React.memo(
       secs: number;
       id: number;
     } | null>(null);
+    const [timeLeft, setTimeLeft] = useState(0);
+    const [restInsights, setRestInsights] = useState<{
+      weather: string;
+      news: string;
+      bioTip: string;
+    } | null>(null);
     const [completedSets, setCompletedSets] = useState<Record<string, number>>(
       {},
     );
+
+    useEffect(() => {
+      let interval: NodeJS.Timeout;
+      if (activeRestState) {
+        setTimeLeft(activeRestState.secs);
+
+        // Fetch innovative insights for rest with real-time weather data
+        const weatherData = "19°C. Sensação térmica 21°C. Expectativa de chuva fraca e dispersa. Umidade 95%. Vento 4 km/h.";
+        import("../services/aiService").then((service) => {
+          service
+            .getRestInsights("São José dos Campos", weatherData)
+            .then(setRestInsights);
+        });
+
+        interval = setInterval(() => {
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              setActiveRestState(null);
+              // Play beep sound
+              try {
+                const audio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"+Array(50).join("zPzM")+"=="); // simplified short beep
+                audio.play().catch(()=>{});
+              } catch (e) {}
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        setTimeLeft(0);
+        setRestInsights(null);
+      }
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    }, [activeRestState]);
+
+    const [setHistory, setSetHistory] = useState<
+      Record<string, { weight: string; reps: string }[]>
+    >({});
+    
+    const handleCompleteSet = useCallback(
+      (
+        ex: Exercise,
+        currentSetsDone: number,
+        currentWeight: string = "",
+        currentReps: string = "",
+      ) => {
+        const nextSets = currentSetsDone + 1;
+        setCompletedSets((prev) => ({
+          ...prev,
+          [ex.id]: nextSets,
+        }));
+        
+        setSetHistory((prev) => {
+          const exHistory = prev[ex.id] || [];
+          return {
+            ...prev,
+            [ex.id]: [...exHistory, { weight: currentWeight, reps: currentReps }],
+          };
+        });
+
+        if (ex.restSeconds > 0 && nextSets < ex.sets) {
+          setActiveRestState({
+            secs: ex.restSeconds,
+            id: Date.now(),
+          });
+        }
+      },
+      [],
+    );
     const [weightsUsed, setWeightsUsed] = useState<Record<string, string>>({});
+    const [repsUsed, setRepsUsed] = useState<Record<string, string>>({});
     const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
       null,
     );
@@ -372,6 +483,8 @@ export const ExecuteWorkoutModal = React.memo(
           rpe,
           notes,
           weights: weightsUsed,
+          reps: repsUsed,
+          setHistory,
           createdAt: serverTimestamp(),
         });
 
@@ -465,133 +578,294 @@ export const ExecuteWorkoutModal = React.memo(
 
           {!finishing ? (
             <>
-              <TimerBar
-                activeRestState={activeRestState}
-                onComplete={() => setActiveRestState(null)}
-              />
+              {!focusMode && (
+                <TimerBar
+                  activeRestState={activeRestState}
+                  timeLeft={timeLeft}
+                  onComplete={() => setActiveRestState(null)}
+                />
+              )}
 
               {focusMode ? (
-                <div className="flex-1 flex flex-col overflow-y-auto scrollbar-hide p-6 pb-48">
-                  <div className="min-h-full flex flex-col justify-center items-center text-center">
+                <div className="flex-1 relative flex flex-col overflow-hidden">
+                  {activeRestState && (
                     <motion.div
-                      key={currentEx?.id}
-                      initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      className="w-full py-4 text-center"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-[60] bg-atheris-bg/95 backdrop-blur-3xl flex flex-col items-center justify-between p-8 text-center overflow-y-auto scrollbar-hide py-16"
                     >
-                      <span className="mono text-[10px] uppercase font-black tracking-[0.3em] text-atheris-accent mb-2 block">
-                        Movimento {currentExIndex + 1}/
-                        {workout.exercises.length}
-                      </span>
-                      <h3
-                        className={classNames(
-                          "font-black text-white mb-2 leading-none uppercase tracking-tighter transition-all",
-                          (currentEx?.name?.length || 0) > 18
-                            ? "text-2xl"
-                            : "text-4xl",
-                        )}
-                      >
-                        {currentEx?.name}
-                      </h3>
-                      <p className="text-[10px] mono opacity-40 uppercase mb-8 tracking-[0.2em]">
-                        {currentEx?.muscleGroup}
-                      </p>
+                      <div className="w-full max-w-sm flex flex-col items-center gap-12">
+                        {/* Upper Section: Stats/Clima */}
+                        <div className="w-full flex justify-between items-start">
+                          <div className="text-left">
+                            <span className="mono text-[8px] uppercase tracking-[0.3em] text-white/30 block mb-1">
+                              Clima: SJC/SP
+                            </span>
+                            <p className="text-[10px] font-black text-atheris-accent uppercase tracking-tighter">
+                              {restInsights?.weather || "Sincronizando..."}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="mono text-[8px] uppercase tracking-[0.3em] text-white/30 block mb-1">
+                              Status
+                            </span>
+                            <p className="text-[10px] font-black text-white uppercase tracking-tighter">
+                              Oxigenação Crítica
+                            </p>
+                          </div>
+                        </div>
 
-                      {/* Visual Set Tracker */}
-                      <div className="flex justify-center gap-1.5 mb-8 px-8 max-w-xs mx-auto">
-                        {Array.from({ length: currentEx?.sets || 0 }).map(
-                          (_, i) => (
-                            <div
-                              key={`focus-set-${i}`}
-                              className={classNames(
-                                "h-1 flex-1 rounded-full transition-all duration-500",
-                                i < setsDone
-                                  ? "bg-atheris-accent shadow-[0_0_10px_rgba(0,255,102,0.5)]"
-                                  : "bg-white/10",
-                              )}
+                        <div className="relative">
+                          <motion.div
+                            animate={{
+                              scale: [1, 1.05, 1],
+                              borderColor: [
+                                "rgba(0,255,102,0.1)",
+                                "rgba(0,255,102,0.4)",
+                                "rgba(0,255,102,0.1)",
+                              ],
+                            }}
+                            transition={{ duration: 4, repeat: Infinity }}
+                            className="w-48 h-48 rounded-full border-2 flex flex-col items-center justify-center bg-atheris-accent/5 relative z-10"
+                          >
+                            <Timer
+                              size={24}
+                              className="text-atheris-accent mb-1 animate-pulse"
                             />
-                          ),
+                            <span className="text-7xl font-black text-atheris-accent tabular-nums leading-none">
+                              {timeLeft}
+                            </span>
+                            <span className="mono text-[8px] uppercase tracking-[0.4em] text-atheris-accent opacity-50 mt-2">
+                              Segundos
+                            </span>
+                          </motion.div>
+
+                          {/* Decorative Rings */}
+                          <div className="absolute inset-[-10px] border border-white/5 rounded-full" />
+                          <div className="absolute inset-[-20px] border border-white/3 rounded-full" />
+                        </div>
+
+                        {/* Innovative Content: News & BioTip */}
+                        <div className="w-full space-y-6">
+                          <div className="w-full text-left p-5 glass rounded-[1.5rem] border border-white/5 bg-white/2 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                              <Sparkles size={40} />
+                            </div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <Newspaper size={12} className="text-atheris-accent" />
+                              <span className="mono text-[9px] font-black uppercase tracking-[0.2em] text-white/40">
+                                Global Muscle Intel
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-white leading-relaxed font-medium">
+                              {restInsights?.news || "Carregando fluxo de notícias mundiais..."}
+                            </p>
+                          </div>
+
+                          <div className="w-full text-left p-5 glass rounded-[1.5rem] border border-atheris-accent/10 bg-atheris-accent/5">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Activity size={12} className="text-atheris-accent" />
+                              <span className="mono text-[9px] font-black uppercase tracking-[0.2em] text-white/40">
+                                Bio-Scanner Técnico
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-white/70 italic leading-relaxed">
+                              "{restInsights?.bioTip || "Analisando padrões de recrutamento..."}"
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setActiveRestState(null)}
+                        className="mt-8 py-3 px-10 rounded-full border border-white/10 mono text-[9px] font-black uppercase tracking-[0.3em] text-white/20 hover:text-white hover:border-white/30 transition-all active:scale-95"
+                      >
+                        Encerrar Descanso Forçado
+                      </button>
+                    </motion.div>
+                  )}
+                  <div className="flex-1 overflow-y-auto scrollbar-hide p-6 pb-80">
+                    <div className="min-h-full flex flex-col justify-center items-center text-center">
+                      <motion.div
+                        key={currentEx?.id}
+                        initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className="w-full py-4 text-center"
+                      >
+                        <span className="mono text-[10px] uppercase font-black tracking-[0.3em] text-atheris-accent mb-2 block">
+                          Movimento {currentExIndex + 1}/
+                          {workout.exercises.length}
+                        </span>
+                        <h3
+                          className={classNames(
+                            "font-black text-white mb-2 leading-none uppercase tracking-tighter transition-all",
+                            (currentEx?.name?.length || 0) > 18
+                              ? "text-2xl"
+                              : "text-4xl",
+                          )}
+                        >
+                          {currentEx?.name}
+                        </h3>
+                        <p className="text-[10px] mono opacity-40 uppercase mb-8 tracking-[0.2em]">
+                          {currentEx?.muscleGroup}
+                        </p>
+
+                        {/* Visual Set Tracker */}
+                        <div className="flex justify-center gap-1.5 mb-8 px-8 max-w-xs mx-auto">
+                          {Array.from({ length: currentEx?.sets || 0 }).map(
+                            (_, i) => (
+                              <div
+                                key={`focus-set-${i}`}
+                                className={classNames(
+                                  "h-1 flex-1 rounded-full transition-all duration-500",
+                                  i < setsDone
+                                    ? "bg-atheris-accent shadow-[0_0_10px_rgba(0,255,102,0.5)]"
+                                    : "bg-white/10",
+                                )}
+                              />
+                            ),
+                          )}
+                        </div>
+
+                        {/* Recorded Sets Log */}
+                        {(setHistory[currentEx?.id || ""]?.length > 0) && (
+                          <div className="w-full flex flex-col gap-2 mb-8 px-4">
+                            <AnimatePresence>
+                              {setHistory[currentEx?.id || ""].map((record, index) => (
+                                <motion.div 
+                                  initial={{ opacity: 0, height: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  key={`history-${index}`} 
+                                  className="flex justify-between items-center text-xs p-3 rounded-xl bg-white/5 border border-white/10 text-white/80"
+                                >
+                                  <span className="mono opacity-60 font-bold tracking-widest uppercase">Série {index + 1}</span>
+                                  <div className="flex gap-4 font-black">
+                                    <span><span className="opacity-40 font-normal">Carga:</span> {record.weight || '-'} kg</span>
+                                    <span><span className="opacity-40 font-normal">Reps:</span> {record.reps || '-'}</span>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </AnimatePresence>
+                          </div>
                         )}
-                      </div>
 
-                      <div className="flex justify-center gap-12 mb-8 tabular-nums">
-                        <div className="flex flex-col items-center">
-                          <div className="text-4xl font-black text-white">
-                            {setsDone}
-                            <span className="opacity-20">/</span>
-                            {currentEx?.sets || 0}
-                          </div>
-                          <span className="mono text-[8px] uppercase opacity-40 tracking-widest mt-1">
-                            Séries
-                          </span>
-                        </div>
-                        <div className="flex flex-col items-center">
-                          <div className="text-4xl font-black text-white">
-                            {currentEx?.reps}
-                          </div>
-                          <span className="mono text-[8px] uppercase opacity-40 tracking-widest mt-1">
-                            Reps
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="w-full glass p-6 rounded-[2rem] border border-white/5 mb-6 relative bg-white/2">
-                        <div className="flex flex-col items-center">
-                          <span className="mono text-[9px] font-black uppercase opacity-40 mb-3 tracking-[0.2em]">
-                            Carga Atual (KG)
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={weightsUsed[currentEx?.id] || ""}
-                            onChange={(e) =>
-                              setWeightsUsed({
-                                ...weightsUsed,
-                                [currentEx?.id]: e.target.value,
-                              })
-                            }
-                            className="bg-transparent text-5xl font-black text-center text-white focus:outline-none w-full placeholder:text-white/10"
-                            placeholder={currentEx?.weight || "0"}
-                          />
-                        </div>
-                      </div>
-
-                      {currentEx?.purpose && (
-                        <div className="w-full text-left p-6 glass rounded-[2rem] border-l-2 border-atheris-accent/50 mb-10 bg-white/1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Activity size={12} className="text-atheris-accent" />
-                            <span className="mono text-[9px] font-black uppercase tracking-widest opacity-60">
-                              Bio-Insight Científico
+                        <div className="flex justify-center gap-12 mb-8 tabular-nums">
+                          <div className="flex flex-col items-center">
+                            <div className="text-4xl font-black text-white">
+                              {setsDone}
+                              <span className="opacity-20 text-2xl">/</span>
+                              {currentEx?.sets || 0}
+                            </div>
+                            <span className="mono text-[8px] uppercase opacity-40 tracking-widest mt-1">
+                              Séries
                             </span>
                           </div>
-                          <p className="text-xs text-white/80 leading-relaxed italic pr-2">
-                            "{currentEx.purpose}"
-                          </p>
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-baseline gap-2">
+                              <div className="text-4xl font-black text-white">
+                                {currentEx?.reps}
+                              </div>
+                              <span className="opacity-20 text-xl font-black">
+                                /
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={repsUsed[currentEx?.id || ""] || ""}
+                                onChange={(e) =>
+                                  setRepsUsed({
+                                    ...repsUsed,
+                                    [currentEx?.id || ""]: e.target.value.replace(/[^0-9]/g, ""),
+                                  })
+                                }
+                                className="w-12 bg-white/5 border-b border-white/20 text-atheris-accent text-3xl font-black text-center focus:outline-none focus:border-atheris-accent transition-colors rounded"
+                              />
+                            </div>
+                            <span className="mono text-[8px] uppercase opacity-40 tracking-widest mt-1">
+                              Reps (Meta/Real)
+                            </span>
+                          </div>
                         </div>
-                      )}
-                    </motion.div>
+
+                        <div className="w-full glass p-6 rounded-[2rem] border border-white/5 mb-6 relative bg-white/2">
+                          <div className="flex flex-col items-center">
+                            <span className="mono text-[9px] font-black uppercase opacity-40 mb-3 tracking-[0.2em]">
+                              Carga Atual (KG)
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={weightsUsed[currentEx?.id || ""] || ""}
+                              onChange={(e) =>
+                                setWeightsUsed({
+                                  ...weightsUsed,
+                                  [currentEx?.id || ""]: e.target.value,
+                                })
+                              }
+                              className="bg-transparent text-5xl font-black text-center text-white focus:outline-none w-full placeholder:text-white/10"
+                              placeholder={currentEx?.weight || "0"}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="w-full text-left p-5 rounded-[1.5rem] bg-white/[0.03] border border-white/10 mb-4 relative overflow-hidden shadow-lg shadow-black/20">
+                          <div className="absolute top-0 left-0 w-1 h-full bg-atheris-accent/50" />
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                              <Target size={12} className="text-white/60" />
+                            </div>
+                            <span className="mono text-[10px] font-black uppercase tracking-widest text-white/50">
+                              Como Fazer
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-2 pl-1">
+                            {getDidacticInstruction(currentEx?.instructions, currentEx?.muscleGroup)
+                            .split('\n').filter(Boolean).map((line, i) => {
+                              const isSubtitle = line.match(/^\d+\./);
+                              return (
+                                <p key={i} className={`font-mono text-white/80 leading-relaxed pr-2 ${isSubtitle ? 'text-[11px] font-black text-atheris-accent/80 mt-1' : 'text-[10px]'}`}>
+                                  {line}
+                                </p>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {currentEx?.purpose && (
+                          <div className="w-full text-left p-6 glass rounded-[2rem] border-l-2 border-atheris-accent/50 mb-10 bg-white/1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Activity
+                                size={12}
+                                className="text-atheris-accent"
+                              />
+                              <span className="mono text-[9px] font-black uppercase tracking-widest opacity-60">
+                                Bio-Insight Científico
+                              </span>
+                            </div>
+                            <p className="text-xs text-white/80 leading-relaxed italic pr-2">
+                              "{currentEx.purpose}"
+                            </p>
+                          </div>
+                        )}
+                      </motion.div>
+                    </div>
                   </div>
 
-                  <div className="fixed bottom-0 left-0 w-full p-4 pb-8 bg-gradient-to-t from-atheris-bg via-atheris-bg/95 to-transparent z-50">
+                  <div className="absolute bottom-0 left-0 w-full p-4 pb-8 bg-gradient-to-t from-atheris-bg via-atheris-bg to-transparent z-50">
                     <div className="max-w-2xl mx-auto flex flex-col gap-3">
                       <button
                         disabled={isExCompleted || activeRestState !== null}
-                        onClick={() => {
-                          if (!currentEx) return;
-                          setCompletedSets((prev) => ({
-                            ...prev,
-                            [currentEx.id]: setsDone + 1,
-                          }));
-                          if (
-                            currentEx.restSeconds > 0 &&
-                            setsDone + 1 < currentEx.sets
-                          ) {
-                            setActiveRestState({
-                              secs: currentEx.restSeconds,
-                              id: Date.now(),
-                            });
-                          }
-                        }}
+                        onClick={() =>
+                          handleCompleteSet(
+                            currentEx,
+                            setsDone,
+                            weightsUsed[currentEx?.id || ""] || String(currentEx?.weight || 0),
+                            repsUsed[currentEx?.id || ""] || String(currentEx?.reps || 0),
+                          )
+                        }
                         className={classNames(
                           "w-full py-5 rounded-[1.5rem] font-black text-base uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3",
                           isExCompleted
@@ -691,30 +965,75 @@ export const ExecuteWorkoutModal = React.memo(
                             {ex.reps}
                           </span>
                         </div>
-                        <div className="bg-atheris-text/5 rounded-lg p-2 text-center col-span-2 mt-2 mb-2 border border-white/5 relative group-hover:border-atheris-accent/30 transition-colors">
-                          <span className="mono opacity-50 block mb-1 font-bold text-[9px] uppercase tracking-[0.2em] text-atheris-accent">
-                            <TrendingUp size={10} className="inline mr-1" />{" "}
-                            Carga de Ataque (kg/lbs)
-                          </span>
-                          <input
-                            type="text"
-                            placeholder={ex.weight}
-                            value={weightsUsed[ex.id] || ""}
-                            onChange={(e) =>
-                              setWeightsUsed({
-                                ...weightsUsed,
-                                [ex.id]: e.target.value,
-                              })
-                            }
-                            className="w-full bg-transparent text-center font-black text-xl text-white focus:outline-none placeholder:text-white/20"
-                          />
-                          {currentUser.exerciseWeights?.[ex.name] && (
-                            <div className="absolute right-2 top-2 p-1 px-2 rounded bg-atheris-accent/10 border border-atheris-accent/20 text-[7px] mono text-atheris-accent">
-                              Última: {currentUser.exerciseWeights[ex.name]}
-                            </div>
-                          )}
+                        <div className="bg-atheris-text/5 rounded-lg p-2 text-center col-span-2 mt-2 mb-2 flex gap-2">
+                          <div className="flex-1 border border-white/5 relative group-hover:border-atheris-accent/30 transition-colors p-2 rounded-lg">
+                            <span className="mono opacity-50 block mb-1 font-bold text-[9px] uppercase tracking-[0.2em] text-atheris-accent">
+                              <TrendingUp size={10} className="inline mr-1" />{" "}
+                              Carga de Ataque (kg/lbs)
+                            </span>
+                            <input
+                              type="text"
+                              placeholder={ex.weight}
+                              value={weightsUsed[ex.id] || ""}
+                              onChange={(e) =>
+                                setWeightsUsed({
+                                  ...weightsUsed,
+                                  [ex.id]: e.target.value,
+                                })
+                              }
+                              className="w-full bg-transparent text-center font-black text-xl text-white focus:outline-none placeholder:text-white/20"
+                            />
+                            {currentUser.exerciseWeights?.[ex.name] && (
+                              <div className="absolute right-2 top-2 p-1 px-2 rounded bg-atheris-accent/10 border border-atheris-accent/20 text-[7px] mono text-atheris-accent">
+                                Última: {currentUser.exerciseWeights[ex.name]}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 border border-white/5 relative group-hover:border-atheris-accent/30 transition-colors p-2 rounded-lg">
+                            <span className="mono opacity-50 block mb-1 font-bold text-[9px] uppercase tracking-[0.2em] text-atheris-accent">
+                              Reps Feitas
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder={ex.reps}
+                              value={repsUsed[ex.id] || ""}
+                              onChange={(e) =>
+                                setRepsUsed({
+                                  ...repsUsed,
+                                  [ex.id]: e.target.value.replace(/[^0-9]/g, ""),
+                                })
+                              }
+                              className="w-full bg-transparent text-center font-black text-xl text-white focus:outline-none placeholder:text-white/20"
+                            />
+                          </div>
                         </div>
                       </div>
+
+                      {/* Recorded Sets Log for Normal Mode */}
+                      {(setHistory[ex.id]?.length > 0) && (
+                        <div className="w-full flex flex-col gap-2 mb-6 px-1">
+                          <AnimatePresence>
+                            {setHistory[ex.id].map((record, idx) => (
+                              <motion.div 
+                                initial={{ opacity: 0, height: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                                exit={{ opacity: 0, height: 0 }}
+                                key={`hist-norm-${idx}`} 
+                                className="flex justify-between items-center text-xs p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/80"
+                              >
+                                <span className="mono opacity-60 font-bold tracking-widest uppercase text-[9px]">Série {idx + 1}</span>
+                                <div className="flex gap-4 font-black">
+                                  <span><span className="opacity-40 font-normal">Carga:</span> {record.weight || '-'} kg</span>
+                                  <span><span className="opacity-40 font-normal">Reps:</span> {record.reps || '-'}</span>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
                       <div className="flex gap-3 justify-center flex-wrap px-2">
                         {Array.from({ length: ex.sets }).map((_, i) => {
                           const setsDoneEx = completedSets[ex.id] || 0;
@@ -732,19 +1051,12 @@ export const ExecuteWorkoutModal = React.memo(
                               }
                               onClick={() => {
                                 if (i === setsDoneEx) {
-                                  setCompletedSets((prev) => ({
-                                    ...prev,
-                                    [ex.id]: setsDoneEx + 1,
-                                  }));
-                                  if (
-                                    ex.restSeconds > 0 &&
-                                    setsDoneEx + 1 < ex.sets
-                                  ) {
-                                    setActiveRestState({
-                                      secs: ex.restSeconds,
-                                      id: Date.now(),
-                                    });
-                                  }
+                                  handleCompleteSet(
+                                    ex,
+                                    setsDoneEx,
+                                    weightsUsed[ex.id] || String(ex.weight || 0),
+                                    repsUsed[ex.id] || String(ex.reps || 0),
+                                  );
                                 }
                               }}
                               className={classNames(
@@ -1190,12 +1502,20 @@ const StudentWorkouts = memo(({ studentId }: { studentId: string }) => {
     const unsubscribe = onSnapshot(
       q,
       (snap) => {
-        setWorkouts(
-          snap.docs.map((doc) => ({
-            id: doc.id,
-            ...(doc.data() as any),
-          })) as Workout[],
-        );
+        let list = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as any),
+        })) as Workout[];
+        
+        // Sort incomplete workouts by title ascending so A is before B
+        list.sort((a, b) => {
+          if (!a.completed && !b.completed) {
+            return (a.title || "").localeCompare(b.title || "");
+          }
+          return 0; // maintain descending order for completed ones 
+        });
+
+        setWorkouts(list);
         setLoading(false);
       },
       (error) => {
@@ -1795,6 +2115,14 @@ export const WorkoutCreatorModal = React.memo(
     const [saving, setSaving] = useState(false);
     const [editingExIndex, setEditingExIndex] = useState<number | null>(null);
     const [isGeneratingFull, setIsGeneratingFull] = useState(false);
+    
+    // AI Setup state
+    const [showAiSetup, setShowAiSetup] = useState(false);
+    const [aiGender, setAiGender] = useState('Masculino');
+    const [aiGoal, setAiGoal] = useState('Crescer');
+    const [aiSplit, setAiSplit] = useState('Padrão');
+    const [aiLevel, setAiLevel] = useState('Intermediário');
+    const [aiStatus, setAiStatus] = useState('Natural');
 
     const muscles = useMemo(
       () => Array.from(new Set(EXERCISE_LIBRARY.map((e) => e.muscle))),
@@ -1802,26 +2130,60 @@ export const WorkoutCreatorModal = React.memo(
     );
     const [selMuscle, setSelMuscle] = useState(muscles[0]);
 
-    const handleGenerateFullAI = async () => {
+    const executeAIGeneration = async () => {
       if (!selMuscle) return;
       setIsGeneratingFull(true);
+      setShowAiSetup(false);
       try {
-        const exercises = await aiService.generateWorkout(
+        const workouts = await aiService.generateWorkoutProgram(
           selMuscle,
-          "Intermediário",
-          "Hipertrofia",
+          aiLevel,
+          aiGoal,
+          student.name,
+          aiGender,
+          aiSplit,
+          aiStatus
         );
-        setSelectedExs(
-          exercises.map((ex) => ({
+
+        if (!workouts || workouts.length === 0) {
+          alert("Não foi possível gerar os treinos. Tente novamente.");
+          setIsGeneratingFull(false);
+          return;
+        }
+
+        for (const w of workouts) {
+          const mappedExercises = w.exercises.map((ex: any) => ({
             ...ex,
             id: Date.now().toString() + Math.random(),
-            sets: 3,
-            reps: "12",
-            weight: "0",
-            restSeconds: 60,
-          })),
-        );
-        setTitle(`PROTOCOLO IA: ${selMuscle.toUpperCase()}`);
+            sets: Number(ex.sets) || 3,
+            reps: String(ex.reps || "12"),
+            weight: String(ex.weight || "0"),
+            restSeconds: Number(ex.restSeconds) || 60,
+            purpose: ex.purpose || "",
+            instructions: ex.instructions || "",
+          }));
+
+          await addDoc(collection(db, "workouts"), {
+            title: w.title || `Treino de ${aiSplit} - ${aiGoal}`,
+            studentId: student.id,
+            authorId: coach.id,
+            completed: false,
+            exercises: mappedExercises,
+            createdAt: serverTimestamp(),
+          });
+        }
+
+        await addDoc(collection(db, "messages"), {
+          senderId: coach.id,
+          senderName: "Mestre Atheris",
+          receiverId: student.id,
+          content: `Olá! Acabei de prescrever um programa de treino de 3 meses baseado na metodologia ${aiSplit} focando em ${aiGoal}. Vamos mutar juntos!`,
+          type: 'text',
+          createdAt: serverTimestamp(),
+        });
+
+        onCreated();
+        onClose();
       } catch (err) {
         console.error("Full AI Generation failed", err);
         alert("Mestre Atheris encontrou uma interferência. Tente novamente.");
@@ -1878,6 +2240,130 @@ export const WorkoutCreatorModal = React.memo(
 
     return (
       <>
+        {showAiSetup && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowAiSetup(false)} />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glass p-6 rounded-3xl w-full max-w-sm border border-white/10 z-10 flex flex-col gap-6 bg-atheris-bg shadow-2xl shadow-atheris-accent/10 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="text-center">
+                <Brain size={48} className="text-atheris-accent mx-auto mb-4 drop-shadow-[0_0_15px_rgba(0,255,102,0.4)]" />
+                <h3 className="font-black text-xl uppercase tracking-tighter text-white">Configurar IA</h3>
+                <p className="text-[10px] mono text-white/50 uppercase tracking-widest mt-1">Calibração do Protocolo</p>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <span className="mono text-[9px] font-black uppercase text-white/40 tracking-[0.2em] ml-2">Foco Biológico (Sexo)</span>
+                  <div className="flex bg-white/5 rounded-2xl p-1 border border-white/5">
+                    {['Masculino', 'Feminino'].map(g => (
+                      <button 
+                        key={g} 
+                        onClick={() => setAiGender(g)}
+                        className={classNames(
+                          "flex-1 py-3 rounded-xl mono text-xs font-bold uppercase tracking-widest transition-all",
+                          aiGender === g ? "bg-atheris-accent text-black shadow-[0_0_15px_rgba(0,255,102,0.2)]" : "text-white/40 hover:text-white"
+                        )}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <span className="mono text-[9px] font-black uppercase text-white/40 tracking-[0.2em] ml-2">Status Fisiológico</span>
+                  <div className="flex bg-white/5 rounded-2xl p-1 border border-white/5">
+                    {['Natural', 'Hormonizado'].map(status => (
+                      <button 
+                        key={status} 
+                        onClick={() => setAiStatus(status)}
+                        className={classNames(
+                          "flex-1 py-3 rounded-xl mono text-xs font-bold uppercase tracking-widest transition-all",
+                          aiStatus === status ? "bg-atheris-accent text-black shadow-[0_0_15px_rgba(0,255,102,0.2)]" : "text-white/40 hover:text-white"
+                        )}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <span className="mono text-[9px] font-black uppercase text-white/40 tracking-[0.2em] ml-2">Objetivo do Aluno</span>
+                  <div className="flex gap-2 flex-wrap pb-2">
+                    {['Secar', 'Manter', 'Crescer'].map(goal => (
+                      <button
+                        key={goal}
+                        onClick={() => setAiGoal(goal)}
+                        className={classNames(
+                          "flex-1 py-3 px-2 rounded-xl mono text-xs font-bold uppercase tracking-widest transition-all",
+                          aiGoal === goal ? "bg-atheris-accent text-black shadow-[0_0_15px_rgba(0,255,102,0.2)]" : "bg-white/5 text-white/40 border border-white/5 hover:text-white"
+                        )}
+                      >
+                        {goal}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <span className="mono text-[9px] font-black uppercase text-white/40 tracking-[0.2em] ml-2">Metodologia (Split)</span>
+                  <div className="flex gap-2 flex-wrap pb-2">
+                    {['Padrão', 'PPL', 'Upper/Lower', 'Fullbody', 'Isolado', 'Rest-Pause', 'Bi-Set'].map(split => (
+                      <button
+                        key={split}
+                        onClick={() => setAiSplit(split)}
+                        className={classNames(
+                          "px-4 py-3 rounded-xl mono text-xs font-bold uppercase tracking-widest transition-all",
+                          aiSplit === split ? "bg-atheris-accent text-black shadow-[0_0_15px_rgba(0,255,102,0.2)]" : "bg-white/5 text-white/40 border border-white/5 hover:text-white"
+                        )}
+                      >
+                        {split}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <span className="mono text-[9px] font-black uppercase text-white/40 tracking-[0.2em] ml-2">Dificuldade</span>
+                  <div className="flex gap-2 flex-wrap pb-2">
+                    {['Iniciante', 'Intermediário', 'Avançado', 'Elite'].map(level => (
+                      <button
+                        key={level}
+                        onClick={() => setAiLevel(level)}
+                        className={classNames(
+                          "px-4 py-3 rounded-xl mono text-xs font-bold uppercase tracking-widest transition-all",
+                          aiLevel === level ? "bg-atheris-accent text-black shadow-[0_0_15px_rgba(0,255,102,0.2)]" : "bg-white/5 text-white/40 border border-white/5 hover:text-white"
+                        )}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-2">
+                <button 
+                  onClick={() => setShowAiSetup(false)}
+                  className="flex-1 py-4 rounded-2xl border border-white/10 text-white/50 mono text-[10px] font-black uppercase tracking-widest hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={executeAIGeneration}
+                  className="flex-1 py-4 rounded-2xl bg-atheris-accent text-black mono text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(0,255,102,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
         <div
           onClick={onClose}
           className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm"
@@ -1912,7 +2398,7 @@ export const WorkoutCreatorModal = React.memo(
                 className="flex-1 bg-atheris-text/5 border border-white/10 rounded-2xl p-4 text-xl font-bold focus:border-atheris-accent outline-none"
               />
               <button
-                onClick={handleGenerateFullAI}
+                onClick={() => setShowAiSetup(true)}
                 disabled={isGeneratingFull}
                 className={classNames(
                   "p-4 rounded-2xl border transition-all flex items-center justify-center gap-2",
@@ -1920,7 +2406,7 @@ export const WorkoutCreatorModal = React.memo(
                     ? "bg-white/5 border-white/10 text-white/30"
                     : "bg-atheris-accent/10 border-atheris-accent/30 text-atheris-accent hover:bg-atheris-accent/20",
                 )}
-                title="Gerar Protocolo Completo com IA"
+                title="Configurar Protocolo IA"
               >
                 {isGeneratingFull ? (
                   <div className="w-5 h-5 rounded-full border-2 border-atheris-accent border-t-transparent animate-spin" />

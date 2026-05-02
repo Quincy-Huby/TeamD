@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Home, Users, Dumbbell, Trophy, Plus, CheckCircle2, ChevronLeft, Image as ImageIcon, Scale, TrendingUp, Search, Filter, Zap, Play, MessageSquare, Send, Frown, Meh, SmilePlus, Megaphone, Activity, AlertCircle, Shield, Droplet, Wind, Flame, Target, Sparkles, AlertTriangle, Home as HomeIcon, MapPin, Crown, Medal, Skull, Gem, LogOut } from 'lucide-react';
+import { Home, Users, Dumbbell, Plus, CheckCircle2, ChevronLeft, Image as ImageIcon, Scale, TrendingUp, Search, Filter, Zap, Play, MessageSquare, Send, Frown, Meh, SmilePlus, Megaphone, Activity, AlertCircle, Shield, Droplet, Wind, Flame, Target, Sparkles, AlertTriangle, Home as HomeIcon, MapPin, Crown, Medal, Skull, Gem, LogOut } from 'lucide-react';
+import { SnakeEye } from './SnakeEye';
 import { User, Workout, Message, Challenge } from '../types';
 import { EXERCISE_LIBRARY } from '../exerciseLibrary';
 import { predatorQuotes, mockWorkouts, quickHits, dailyChallenges, mockUsers } from '../mockData';
@@ -455,8 +456,6 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
   const [assignedWorkouts, setAssignedWorkouts] = useState<Workout[]>([]);
   const [nestStats, setNestStats] = useState({ total: 0, active: 0, alert: 0, dormant: 0 });
   const [challengeClaimed, setChallengeClaimed] = useState(false);
-  const [viperAdvice, setViperAdvice] = useState<string | null>(null);
-  const [loadingAdvice, setLoadingAdvice] = useState(false);
   
   // Calculate daily quick hits based on current date
   const todayDate = new Date();
@@ -543,6 +542,11 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
           const exp = w.expiresAt.toDate ? w.expiresAt.toDate() : new Date(w.expiresAt);
           return exp > now;
         });
+
+        validWorkouts.sort((a, b) => {
+          return (a.title || "").localeCompare(b.title || "");
+        });
+
         setAssignedWorkouts(validWorkouts);
 
         // Check if today's challenge was already claimed (regardless of completion)
@@ -568,28 +572,6 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
     }, 30000); // 30 seconds rotation
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (user.role === 'student' && !viperAdvice && !loadingAdvice) {
-      const fetchAdvice = async () => {
-        setLoadingAdvice(true);
-        try {
-          // Fetch checkins for context
-          const q = query(collection(db, 'checkins'), where('studentId', '==', user.id), orderBy('createdAt', 'desc'));
-          const snap = await getDocs(q);
-          const checkins = snap.docs.map(d => d.data());
-          
-          const advice = await aiService.getViperAdvice(user, checkins as any);
-          setViperAdvice(advice);
-        } catch (err) {
-          console.error("Erro ao obter conselho da víbora:", err);
-        } finally {
-          setLoadingAdvice(false);
-        }
-      };
-      fetchAdvice();
-    }
-  }, [user.id, user.role]);
 
   const getChallengeIcon = (iconName: string) => {
     switch(iconName) {
@@ -730,7 +712,7 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
                <span className="block text-5xl font-light text-atheris-text">{completedWorkouts}</span>
             </div>
             <div className="flex-1 glass rounded-2xl p-5 shadow-lg relative group">
-               <div className="absolute top-0 right-0 p-2 opacity-10"><Trophy size={18} className="text-atheris-toxic"/></div>
+               <div className="absolute top-0 right-0 p-2 opacity-10"><SnakeEye size={18} className="text-atheris-toxic"/></div>
                <span className="block mono opacity-60 uppercase mb-2 text-[10px]">Toxinas (Sem.)</span>
                <div className="flex items-end gap-2">
                  <span className="block text-5xl font-light text-atheris-text">{weeklyCompleted}</span>
@@ -739,39 +721,13 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
             </div>
           </div>
 
-      {/* Viper Advice / Bio-Insight Section */}
+      {/* Mantra Section */}
       <div className="mb-10 relative">
-        <AnimatePresence mode="wait">
-          {viperAdvice ? (
-            <motion.div 
-              key="advice"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass p-6 rounded-[2.5rem] border border-atheris-accent/20 bg-atheris-accent/5 relative overflow-hidden shadow-2xl shadow-atheris-accent/5"
-            >
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <Sparkles size={40} className="text-atheris-accent" />
-              </div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-atheris-accent animate-pulse" />
-                <span className="mono text-[9px] font-black uppercase tracking-[0.3em] text-atheris-accent">Bio-Insight Atheris</span>
-              </div>
-              <p className="text-lg font-black text-white leading-tight italic">
-                "{viperAdvice}"
-              </p>
-              <div className="mt-4 flex justify-end">
-                <span className="text-[7px] mono uppercase opacity-30 tracking-widest">— Atheris Suprema v3.0</span>
-              </div>
-            </motion.div>
-          ) : (
-            <div className="p-6 glass rounded-3xl border-l-4 border-atheris-accent relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-4 opacity-5"><Zap size={40} /></div>
-               <p className="text-atheris-text/80 italic text-sm leading-relaxed relative z-10">"{quote}"</p>
-               <p className="mono text-[10px] uppercase mt-4 text-atheris-accent tracking-widest font-bold">— MANTRA ATHERIS</p>
-            </div>
-          )}
-        </AnimatePresence>
+        <div className="p-6 glass rounded-3xl border-l-4 border-atheris-accent relative overflow-hidden">
+           <div className="absolute top-0 right-0 p-4 opacity-5"><Zap size={40} /></div>
+           <p className="text-atheris-text/80 italic text-sm leading-relaxed relative z-10">"{quote}"</p>
+           <p className="mono text-[10px] uppercase mt-4 text-atheris-accent tracking-widest font-bold">— MANTRA ATHERIS</p>
+        </div>
       </div>
 
           {/* Quick Hits */}
@@ -845,11 +801,9 @@ export const TreinosView = React.memo(({ currentUser, onExecute }: {
     const q = query(collection(db, 'workouts'), where('studentId', '==', currentUser.id), where('completed', '==', false));
     const unsubscribe = onSnapshot(q, (snap) => {
         const list = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })) as Workout[];
-        // Sort explicitly by descending creation if possible, or just default id
+        // Sort explicitly by title ascending
         list.sort((a, b) => {
-          const aTime = a.createdAt?.seconds || 0;
-          const bTime = b.createdAt?.seconds || 0;
-          return bTime - aTime;
+          return (a.title || "").localeCompare(b.title || "");
         });
         
         setWorkouts(list.length > 0 ? list : mockWorkouts.filter(w => w.studentId === currentUser.id && w.completed === false));
@@ -928,7 +882,7 @@ export const TreinosView = React.memo(({ currentUser, onExecute }: {
                <Zap size={24} className="text-white/50" />
              </div>
              <p className="italic">Seu arsenal está vazio.</p>
-             <p className="text-[10px] mono tracking-widest uppercase mt-2 opacity-50">Aguarde novas missões do seu Alpha.</p>
+             <p className="text-[10px] mono tracking-widest uppercase mt-2 opacity-50">Aguarde novas missões no sistema.</p>
           </div>
         )}
       </div>
@@ -949,11 +903,19 @@ export const AlunosView = React.memo(({ currentUser, onSelectStudent, onAssignWo
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        const q = query(
-          collection(db, 'users'), 
-          where('role', '==', 'student'),
-          where('coachId', '==', currentUser.id)
-        );
+        let q;
+        if (currentUser.tier === 'Atheris Suprema') {
+          q = query(
+            collection(db, 'users'), 
+            where('role', '==', 'student')
+          );
+        } else {
+          q = query(
+            collection(db, 'users'), 
+            where('role', '==', 'student'),
+            where('coachId', '==', currentUser.id)
+          );
+        }
         const unsubscribe = onSnapshot(q, (snap) => {
           let fetchedStudents = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })) as User[];
           
@@ -1602,23 +1564,23 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
             
             <div className="grid grid-cols-2 gap-3">
                <div className="flex flex-col gap-1.5">
-                  <label className="mono text-[8px] uppercase opacity-40 font-black tracking-widest pl-1">Peso Atual (kg)</label>
+                  <label className="mono text-[8px] uppercase opacity-40 font-black tracking-widest pl-1">Peso (kg)</label>
                   <input 
                     type="number" 
                     placeholder="0.0"
                     value={currentUser.latestWeightKg || ''} 
                     onChange={(e) => handleFieldChange('latestWeightKg', parseFloat(e.target.value))}
-                    className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs mono text-atheris-text focus:border-atheris-accent outline-none transition-colors"
+                    className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs mono text-atheris-text focus:border-atheris-accent outline-none transition-colors w-full"
                   />
                </div>
                <div className="flex flex-col gap-1.5">
-                  <label className="mono text-[8px] uppercase opacity-40 font-black tracking-widest pl-1">Meta de Peso (kg)</label>
+                  <label className="mono text-[8px] uppercase opacity-40 font-black tracking-widest pl-1">Meta (kg)</label>
                   <input 
                     type="number" 
                     placeholder="0.0"
                     value={currentUser.targetWeightKg || ''} 
                     onChange={(e) => handleFieldChange('targetWeightKg', parseFloat(e.target.value))}
-                    className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs mono text-atheris-text focus:border-atheris-accent outline-none transition-colors"
+                    className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs mono text-atheris-text focus:border-atheris-accent outline-none transition-colors w-full"
                   />
                </div>
             </div>
@@ -1629,45 +1591,35 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
       <div className="w-full glass p-6 rounded-[2.5rem] border border-white/5 mb-6 relative overflow-hidden">
          <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
          
-         <h3 className="mono text-[10px] uppercase font-black tracking-[0.2em] opacity-40 mb-8 text-center">Progressão de Tier</h3>
-         
-         <div className="relative flex items-center justify-between px-2 mb-10">
-            <div className="absolute top-1/2 left-0 w-full h-[1px] bg-white/10 -translate-y-1/2 z-0" />
-            {tiers.slice(0, 5).map((t, i) => {
-               const isActive = points >= t.min;
-               return (
-                 <div key={t.name} className="relative z-10 flex flex-col items-center">
-                    <div className={classNames(
-                      "w-2.5 h-2.5 rounded-full border-2 border-[#121413] shadow-sm transition-all duration-1000",
-                      isActive ? "bg-atheris-accent ring-4 ring-atheris-accent/20" : "bg-white/20"
-                    )} />
-                    <span className={classNames(
-                      "absolute -bottom-5 text-[7px] mono uppercase font-black tracking-tighter whitespace-nowrap opacity-20",
-                      isActive && "opacity-50 text-atheris-accent"
-                    )}>
-                      {t.name}
-                    </span>
-                 </div>
-               );
-            })}
+         <div className="flex items-center gap-4 mb-4">
+            <div className="w-12 h-12 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden shrink-0">
+               <div className="absolute inset-0 bg-atheris-accent/10" />
+               <SnakeEye size={20} className="text-atheris-accent" />
+            </div>
+            <div>
+               <h3 className="mono text-[10px] uppercase font-black tracking-widest opacity-40">Progressão de Rank</h3>
+               <p className="mono font-black text-white text-base uppercase tracking-tighter mt-1">{currentTier.name}</p>
+            </div>
          </div>
-
-         <div className="flex justify-between items-end mb-2.5 px-1">
-            <span className="mono text-[8px] font-black uppercase tracking-widest text-atheris-accent opacity-80">
-               {currentTier.name} <span className="opacity-30">→</span> {nextTier.name}
+         
+         <div className="flex justify-between items-end mb-3 px-1 mt-6">
+            <span className="mono text-[9px] font-black uppercase tracking-widest text-white/50">
+               Rumo a: <span className="text-atheris-accent">{nextTier.name}</span>
             </span>
             <span className="mono text-xs font-black text-atheris-accent">{Math.round(progress)}%</span>
          </div>
          
-         <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden mb-4 p-[1px]">
+         <div className="w-full h-3 bg-[#121413] rounded-full mb-4 p-[2px] border border-white/5 relative overflow-hidden">
             <motion.div 
                initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1] }}
-               className="h-full bg-atheris-accent rounded-full shadow-[0_0_15px_rgba(0,255,102,0.4)]"
-            />
+               className="h-full bg-atheris-accent rounded-full relative overflow-hidden"
+            >
+               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+            </motion.div>
          </div>
          
-         <p className="mono text-[9px] font-black uppercase tracking-widest opacity-40 text-center">
-            {remaining > 0 ? `${remaining} V-Points Restantes` : 'Protocolo Máximo Ativo'}
+         <p className="mono text-[8px] font-black uppercase tracking-widest text-atheris-accent/60 text-center">
+            {remaining > 0 ? `${remaining} V-Points para evoluir` : 'Protocolo Máximo Ativo'}
          </p>
       </div>
 
@@ -1678,39 +1630,41 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
             <span className="text-[8px] text-atheris-accent">{currentUser.latestWeightKg} KG ATUAL</span>
          </h3>
          
-         <div className="h-48 w-full -ml-4">
+         <div className="h-48 w-full">
             {weightHistory.length > 1 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weightHistory}>
-                  <defs>
-                    <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#00ff66" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#00ff66" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '10px', fontFamily: 'monospace' }}
-                    itemStyle={{ color: '#00ff66' }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="weight" 
-                    stroke="#00ff66" 
-                    fillOpacity={1} 
-                    fill="url(#weightGradient)" 
-                    strokeWidth={3}
-                    dot={{ fill: '#00ff66', strokeWidth: 2, r: 4, stroke: '#000' }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                  />
-                  <XAxis dataKey="date" hide />
-                  <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="-ml-4 w-[calc(100%+1rem)] h-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={weightHistory}>
+                    <defs>
+                      <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00ff66" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#00ff66" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '10px', fontFamily: 'monospace' }}
+                      itemStyle={{ color: '#00ff66' }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="weight" 
+                      stroke="#00ff66" 
+                      fillOpacity={1} 
+                      fill="url(#weightGradient)" 
+                      strokeWidth={3}
+                      dot={{ fill: '#00ff66', strokeWidth: 2, r: 4, stroke: '#000' }}
+                      activeDot={{ r: 6, strokeWidth: 0 }}
+                    />
+                    <XAxis dataKey="date" hide />
+                    <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
-              <div className="h-full w-full flex flex-col items-center justify-center opacity-30 text-center px-4">
-                 <Scale size={24} className="mb-2" />
-                 <p className="text-[10px] mono uppercase">Dados Insuficientes</p>
-                 <p className="text-[8px] mt-1 italic">Realize mais check-ins para gerar o mapeamento bio-evolutivo.</p>
+              <div className="h-full w-full flex flex-col items-center justify-center text-center px-4">
+                 <Scale size={28} className="mb-3 text-atheris-accent opacity-20" />
+                 <p className="text-[10px] mono uppercase font-black tracking-widest opacity-40">Dados Insuficientes</p>
+                 <p className="text-[9px] mt-2 italic font-mono opacity-30">Realize mais check-ins para gerar seu mapeamento biológico.</p>
               </div>
             )}
          </div>

@@ -1,5 +1,17 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from 'firebase/auth';
+import { 
+  getAuth, 
+  initializeAuth,
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  sendPasswordResetEmail, 
+  updateProfile 
+} from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence, doc, getDocFromServer, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, serverTimestamp, onSnapshot, or, deleteDoc } from 'firebase/firestore';
 
 // Importação opcional do config (evita erro no Vercel se o arquivo não existir)
@@ -20,6 +32,7 @@ const firebaseConfig = {
 console.log("Firebase Config Initialization:", {
   hasApiKey: !!firebaseConfig.apiKey,
   projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain,
   source: (import.meta.env.VITE_FIREBASE_API_KEY) ? "Env Vars" : (localConfig.apiKey ? "Local Config" : "None")
 });
 
@@ -42,8 +55,21 @@ try {
     }
   });
 
-  auth = getAuth(app);
+  // Use initializeAuth for better control over persistence and resolvers, especially in iframes
+  try {
+    auth = initializeAuth(app, {
+      persistence: browserLocalPersistence,
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch (e) {
+    // If already initialized, just get it
+    auth = getAuth(app);
+  }
+
   googleProvider = new GoogleAuthProvider();
+  // Optional: suggest account selection to avoid auth/invalid-credential if multiple accounts are messy
+  googleProvider.setCustomParameters({ prompt: 'select_account' });
+  
   isFirebaseConfigured = true;
 } catch (error) {
   console.error("FIREBASE INIT ERROR:", error);

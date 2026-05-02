@@ -16,8 +16,9 @@ service cloud.firestore {
     // Identificação do Mestre (Admin)
     function isMaster() {
       return isSignedIn() && 
-             request.auth.token.email != null && 
-             (request.auth.token.email.matches('(?i)blackwoodstock1985@gmail.com') || request.auth.token.email.matches('(?i)lucasgab204lgr@gmail.com') || request.auth.token.email.matches('(?i)rafaelsr1990@gmail.com'));
+             request.auth.token != null &&
+             request.auth.token.get('email', '') != '' &&
+             (request.auth.token.get('email', '').matches('(?i)blackwoodstock1985@gmail.com') || request.auth.token.get('email', '').matches('(?i)lucasgab204lgr@gmail.com') || request.auth.token.get('email', '').matches('(?i)rafaelsr1990@gmail.com'));
     }
 
     // Verifica se o usuário é o dono do documento
@@ -85,8 +86,7 @@ service cloud.firestore {
     // Coleção de Treinos
     match /workouts/{workoutId} {
       allow read: if isSignedIn() && (isMaster() || resource.data.studentId == request.auth.uid || resource.data.authorId == request.auth.uid);
-      
-      allow create: if isSignedIn() && (isMaster() || incoming().studentId == request.auth.uid) && isValidWorkout(incoming());
+      allow create: if isSignedIn() && (isMaster() || incoming().authorId == request.auth.uid) && isValidWorkout(incoming());
       
       allow update: if isSignedIn() && (
         isMaster() ||
@@ -98,7 +98,7 @@ service cloud.firestore {
 
     // Coleção de Check-ins
     match /checkins/{checkInId} {
-      allow read: if isSignedIn() && (isMaster() || resource.data.studentId == request.auth.uid);
+      allow read: if isSignedIn() && (isMaster() || resource.data.studentId == request.auth.uid || resource.data.coachId == request.auth.uid);
       allow create: if isSignedIn() && isValidCheckIn(incoming());
     }
 
@@ -106,6 +106,12 @@ service cloud.firestore {
     match /messages/{messageId} {
       allow read: if isSignedIn() && (isMaster() || resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
       allow create: if isSignedIn() && isValidMessage(incoming());
+    }
+
+    // Coleção de Sessões (Treinos Concluídos)
+    match /sessions/{sessionId} {
+      allow read: if isSignedIn() && (isMaster() || resource.data.studentId == request.auth.uid || resource.data.coachId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().studentId == request.auth.uid;
     }
 
     // Cache de Mídia (Opcional)

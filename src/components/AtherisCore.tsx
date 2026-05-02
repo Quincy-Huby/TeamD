@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Role } from '../types';
-import { LayoutGrid, Users, Dumbbell, Trophy, Info, Zap, ChevronLeft, LogOut, Image as ImageIcon, MessageSquare, User as UserIcon } from 'lucide-react';
+import { LayoutGrid, Users, Dumbbell, MessageSquare, User as UserIcon } from 'lucide-react';
+import { SnakeEye } from './SnakeEye';
 
 export const BackgroundBlobs = React.memo(() => (
   <>
@@ -11,86 +12,15 @@ export const BackgroundBlobs = React.memo(() => (
   </>
 ));
 
-export const Header = React.memo(({ user, onLogout, isDarkMode, setIsDarkMode, onSimulatePush, onUpdateUser }: {
-  user: User,
-  onLogout: () => void,
-  isDarkMode: boolean,
-  setIsDarkMode: (v: boolean) => void,
-  onSimulatePush: () => void,
-  onUpdateUser?: (data: Partial<User>) => void
+export const Header = React.memo(({ user }: {
+  user: User
 }) => {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !onUpdateUser) return;
-
-    setIsUploading(true);
-
-    try {
-      const compressedDataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const MAX_SIZE = 400; // Better quality, still small
-            let width = img.width;
-            let height = img.height;
-
-            if (width > height) {
-              if (width > MAX_SIZE) {
-                height = Math.round((height * MAX_SIZE) / width);
-                width = MAX_SIZE;
-              }
-            } else {
-              if (height > MAX_SIZE) {
-                width = Math.round((width * MAX_SIZE) / height);
-                height = MAX_SIZE;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(img, 0, 0, width, height);
-              resolve(canvas.toDataURL('image/png'));
-            } else {
-              reject(new Error('Canvas context not available'));
-            }
-          };
-          img.onerror = () => reject(new Error('Image processing failed'));
-          if (event.target?.result) {
-            img.src = event.target.result as string;
-          } else {
-            reject(new Error('Failed to read image'));
-          }
-        };
-        reader.onerror = () => reject(new Error('File reading failed'));
-        reader.readAsDataURL(file);
-      });
-
-      await onUpdateUser({ avatar: compressedDataUrl });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
   return (
     <header className="fixed top-0 left-0 w-full z-[80] sm:max-w-md sm:translate-x-[-50%] sm:left-[50%]">
        <div className="glass mx-4 mt-4 px-5 py-3 rounded-2xl flex items-center justify-between shadow-2xl border border-white/10">
       <div className="flex items-center gap-3 relative">
         <div className="w-10 h-10 rounded-xl bg-atheris-accent flex items-center justify-center text-black shadow-[0_0_15px_rgba(0,255,102,0.3)]">
-          <Trophy size={20} className="text-black" />
+          <SnakeEye size={20} className="text-black" />
         </div>
         <div className="flex flex-col">
           <span className="font-extrabold text-lg text-atheris-text leading-none tracking-tighter uppercase">Atheris</span>
@@ -100,93 +30,10 @@ export const Header = React.memo(({ user, onLogout, isDarkMode, setIsDarkMode, o
         </div>
       </div>
 
-         <div className="relative">
-           <button 
-            disabled={isUploading}
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="w-10 h-10 rounded-full bg-atheris-text/5 flex items-center justify-center text-atheris-text border border-white/5 hover:border-atheris-accent transition-colors overflow-hidden relative group"
-           >
-             {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="avatar" /> : user.name[0]}
-             {isUploading && (
-               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
-                 <div className="w-5 h-5 border-2 border-white/20 border-t-atheris-accent rounded-full animate-spin" />
-               </div>
-             )}
-           </button>
-
-           <input type="file" ref={fileInputRef} className="hidden" accept="image/*, .png, .jpg, .jpeg, .webp" onChange={handlePhotoChange} />
-
-           <AnimatePresence>
-             {menuOpen && (
-               <motion.div 
-                 initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                 className="absolute right-0 top-14 w-56 glass rounded-2xl p-2 shadow-2xl z-50 border border-white/10"
-               >
-                 <div className="p-3 border-b border-white/5 mb-1">
-                   <p className="font-bold text-sm text-atheris-text truncate">{user.name}</p>
-                   <p className="text-[10px] mono opacity-50 uppercase mt-0.5">{user.role === 'coach' ? 'Atherium' : 'Víbora'}</p>
-                 </div>
-
-                 <button onClick={() => { fileInputRef.current?.click(); setMenuOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-atheris-text flex items-center gap-3 hover:bg-white/5 rounded-xl transition-colors">
-                   <ImageIcon size={16} className="opacity-50" /> Alterar Foto
-                 </button>
-                 
-                 <button onClick={() => { setSettingsOpen(true); setMenuOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-atheris-text flex items-center gap-3 hover:bg-white/5 rounded-xl transition-colors">
-                   <Info size={16} className="opacity-50" /> Portal Atheris
-                 </button>
-                 
-                 <button onClick={() => { onSimulatePush(); setMenuOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-atheris-text flex items-center gap-3 hover:bg-white/5 rounded-xl transition-colors">
-                   <Zap size={16} className="opacity-50" /> Testar Inoculação
-                 </button>
-
-                 <div className="h-px w-full bg-white/5 my-1"></div>
-
-                 <button onClick={onLogout} className="w-full text-left px-4 py-3 text-sm text-red-400 flex items-center gap-3 hover:bg-red-500/10 rounded-xl transition-colors">
-                   <LogOut size={16} className="opacity-50" /> Sair do Habitat
-                 </button>
-               </motion.div>
-             )}
-           </AnimatePresence>
-         </div>
+        <div className="flex items-center gap-3">
+          {/* Ocultando botão de perfil do header conforme solicitado */}
+        </div>
        </div>
-
-       {/* Settings Drawer */}
-       <AnimatePresence>
-         {settingsOpen && (
-           <motion.div 
-             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-             className="fixed inset-0 z-[100] bg-atheris-bg flex flex-col shadow-2xl"
-           >
-             <header className="p-4 pt-12 flex items-center gap-3 border-b border-white/5">
-                <button onClick={() => setSettingsOpen(false)} className="p-2 bg-white/5 rounded-full"><ChevronLeft size={24} /></button>
-                <h2 className="font-bold text-lg">Preferências</h2>
-             </header>
-
-             <div className="flex-1 overflow-y-auto p-6 pt-10 scrollbar-hide">
-               <h2 className="text-xl font-bold mb-6 text-atheris-text">Configurações</h2>
-               
-               <div className="flex flex-col gap-6">
-                 <div className="flex items-center justify-between">
-                   <div>
-                     <h3 className="font-medium text-atheris-text">Tema Visual</h3>
-                     <p className="text-xs opacity-50">Alternar entre Dark/Light mode</p>
-                   </div>
-                   <button 
-                    onClick={() => setIsDarkMode(!isDarkMode)}
-                    className={(isDarkMode ? "bg-white/20" : "bg-atheris-accent") + " w-14 h-8 rounded-full p-1 transition-colors flex items-center"}
-                   >
-                     <motion.div 
-                      layout
-                      className="w-6 h-6 bg-white rounded-full shadow-lg"
-                      animate={{ x: isDarkMode ? 0 : 24 }}
-                     />
-                   </button>
-                 </div>
-               </div>
-             </div>
-           </motion.div>
-         )}
-       </AnimatePresence>
     </header>
   );
 });
@@ -224,11 +71,12 @@ export const TabBar = React.memo(({ role, activeTab, setActiveTab }: {
             <span className="text-[10px] mono font-bold uppercase tracking-widest">Treinos</span>
           </button>
           
+
           <button 
             onClick={() => setActiveTab('rank')}
             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'rank' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
           >
-            <Trophy size={activeTab === 'rank' ? 24 : 20} strokeWidth={activeTab === 'rank' ? 2.5 : 2} />
+            <SnakeEye size={activeTab === 'rank' ? 24 : 20} strokeWidth={activeTab === 'rank' ? 2.5 : 2} />
             <span className="text-[10px] mono font-bold uppercase tracking-widest">Rank</span>
           </button>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Trophy, Info, Zap } from 'lucide-react';
+import { Info, Zap } from 'lucide-react';
+import { SnakeEye } from './components/SnakeEye';
 import { User, Workout, Role } from './types';
 import { auth, db, logout, isFirebaseConfigured } from './firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from 'firebase/auth';
@@ -86,11 +87,11 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
       let msg = 'Falha na autenticação.';
       
       if (code === 'auth/invalid-credential') {
-        msg = 'Credenciais ou configuração inválida. Se for aluno, verifique e-mail/senha. Se for mestre, verifique se o domínio Vercel está autorizado no console do Firebase.';
+        msg = 'Credenciais inválidas. Verifique seu e-mail e senha. Se você usa Google, tente o botão abaixo.';
       } else if (code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         msg = 'E-mail ou senha incorretos. Verifique seus dados.';
       } else if (code === 'auth/email-already-in-use') {
-        msg = 'Este e-mail já está em uso.';
+        msg = 'Este e-mail já está em uso por outro método de login.';
       } else if (code === 'auth/invalid-email') {
         msg = 'E-mail inválido.';
       } else if (code === 'auth/weak-password') {
@@ -98,7 +99,7 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
       } else if (code === 'auth/too-many-requests') {
         msg = 'Muitas tentativas. Tente novamente mais tarde.';
       } else if (code === 'auth/operation-not-allowed') {
-        msg = 'Este método de login não está ativado no Firebase Console.';
+        msg = 'Este método de login (E-mail/Senha) não está ativado no Firebase Console.';
       }
       
       setError(msg);
@@ -115,8 +116,14 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
       await signInWithGoogle();
     } catch (err: any) {
       console.error(err);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setError('Erro ao acessar com Google.');
+      if (err.code === 'auth/popup-closed-by-user') {
+        // Just silent
+      } else if (err.code === 'auth/invalid-credential') {
+        setError('Configuração do Google no Firebase está incompleta ou inválida. Verifique o "authDomain".');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('O login com Google não está ativado no seu projeto Firebase.');
+      } else {
+        setError('Erro ao acessar com Google. ' + (err.message || 'Erro desconhecido.'));
       }
     } finally {
       setLoading(false);
@@ -125,6 +132,10 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 z-10 w-full max-w-sm mx-auto">
+       <div className="w-24 h-24 mb-6 rounded-full border border-white/10 flex items-center justify-center bg-atheris-text/5 relative overflow-hidden">
+         <div className="absolute inset-0 bg-gradient-to-tr from-atheris-accent/20 to-transparent opacity-50"></div>
+         <SnakeEye size={40} className="text-atheris-accent" />
+       </div>
        <h1 className="text-5xl font-black text-atheris-text tracking-tighter mb-4 text-center">ATHERIS</h1>
        <p className="text-atheris-accent mono mb-8">Por favor, acesse o habitat.</p>
 
@@ -463,7 +474,7 @@ export default function App() {
           {notifications.map(n => (
             <motion.div key={n.id} initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="w-full glass p-4 rounded-2xl flex items-center gap-3 shadow-2xl border border-white/10">
               <div className={classNames("w-10 h-10 rounded-full flex items-center justify-center shrink-0", n.type === 'achievement' ? 'bg-atheris-accent text-black' : 'bg-white/10 text-atheris-accent')}>
-                {n.type === 'achievement' ? <Trophy size={20} /> : <Info size={20} />}
+                {n.type === 'achievement' ? <SnakeEye size={20} /> : <Info size={20} />}
               </div>
               <div>
                 <h4 className="font-bold text-sm leading-tight">{n.title}</h4>
@@ -476,19 +487,7 @@ export default function App() {
 
       {!currentUser ? <Login onLogin={setCurrentUser} /> : (
         <>
-          <Header user={currentUser} onLogout={handleLogout} isDarkMode={isDarkMode} setIsDarkMode={toggleDarkMode} onSimulatePush={() => {
-             addNotification('Atenção Atherium', 'Um novo sinal foi detectado no ninho.', 'info');
-          }}
-          onUpdateUser={async (data) => {
-            const updated = { ...currentUser, ...data };
-            setCurrentUser(updated);
-            try {
-               await updateDoc(doc(db, 'users', currentUser.id), data);
-            } catch (err) {
-               console.error('Failed to save to firebase', err);
-            }
-          }}
-          />
+          <Header user={currentUser} />
           
           <main className="flex-1 overflow-y-auto overflow-x-hidden relative z-10 scrollbar-hide pb-20">
             <AnimatePresence mode="popLayout">
