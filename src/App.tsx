@@ -22,6 +22,17 @@ const Login = memo(({ onLogin }: { onLogin: (u: User) => void }) => {
   const [coaches, setCoaches] = useState<{id: string, name: string}[]>([]);
   const [selectedCoachId, setSelectedCoachId] = useState('');
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const inviteCoachId = params.get('coachId');
+    if (inviteCoachId) {
+       localStorage.setItem('pendingCoachId', inviteCoachId);
+       setMode('register');
+       // Remove parameter from URL visually
+       window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   // Fetch available coaches on register
   useEffect(() => {
     if (mode === 'register') {
@@ -250,7 +261,7 @@ export default function App() {
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [notifications, setNotifications] = useState<{id: string, title: string, message: string, type: string}[]>([]);
-  const [stats, setStats] = useState({ completed: 0, weekly: 0 });
+  const [stats, setStats] = useState({ completed: 0, weekly: 0, total: 0 });
 
   // Memoized action handlers to prevent re-renders
   const addNotification = useCallback((title: string, message: string, type = 'info') => {
@@ -299,7 +310,7 @@ export default function App() {
          }
       });
       
-      setStats({ completed: monthlyWorkouts, weekly: weeksActive.size });
+      setStats({ completed: monthlyWorkouts, weekly: weeksActive.size, total: snaps.size });
     } catch (err) {
       console.error("Failed to load stats", err);
     }
@@ -308,7 +319,7 @@ export default function App() {
   const handleLogout = useCallback(() => {
     logout();
     setActiveTab('home');
-    setStats({ completed: 0, weekly: 0 });
+    setStats({ completed: 0, weekly: 0, total: 0 });
   }, []);
 
   const toggleDarkMode = useCallback((v: boolean) => setIsDarkMode(v), []);
@@ -513,7 +524,7 @@ export default function App() {
           
           <main className="flex-1 overflow-y-auto overflow-x-hidden relative z-10 scrollbar-hide pb-20">
             <AnimatePresence mode="popLayout">
-              {activeTab === 'home' && <HomeView key="home" user={currentUser} completedWorkouts={stats.completed} weeklyCompleted={stats.weekly} weeklyGoal={5} onCheckIn={startCheckIn} onExecuteQuickHit={handleExecuteQuickHit} onExecuteWorkout={setExecutingWorkout} />}
+              {activeTab === 'home' && <HomeView key="home" user={currentUser} completedWorkouts={stats.completed} weeklyCompleted={stats.weekly} totalCompleted={stats.total} weeklyGoal={5} onCheckIn={startCheckIn} onExecuteQuickHit={handleExecuteQuickHit} onExecuteWorkout={setExecutingWorkout} onLogout={handleLogout} />}
               {activeTab === 'treinos' && <TreinosView key="treinos" currentUser={currentUser} onExecute={setExecutingWorkout} />}
               {activeTab === 'alunos' && <AlunosView key="alunos" currentUser={currentUser} onSelectStudent={selectStudent} onAssignWorkout={assignToStudent} />}
               {activeTab === 'chat' && <AdminChatView key="chat" currentUser={currentUser} onExecuteWorkout={setExecutingWorkout} />}

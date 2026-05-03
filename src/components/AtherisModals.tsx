@@ -916,82 +916,92 @@ export const ExecuteWorkoutModal = React.memo(
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto p-4 pb-32 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto p-0 pb-32 scrollbar-hide">
                   {workout.exercises.map((ex, index) => (
                     <div
                       key={`${ex.id}-${index}`}
-                      className="glass p-4 rounded-2xl mb-4 relative overflow-hidden group"
+                      className="glass mx-4 mt-6 p-6 rounded-[2rem] relative overflow-hidden group border border-white/[0.08] shadow-lg"
                     >
                       {(completedSets[ex.id] || 0) >= ex.sets && (
-                        <div className="absolute top-0 right-0 w-12 h-12 bg-atheris-accent/10 flex items-center justify-center rounded-bl-3xl border-l border-b border-atheris-accent/20">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-atheris-accent/10 flex items-center justify-center rounded-bl-[2.5rem] border-l border-b border-atheris-accent/20">
                           <CheckCircle2
-                            size={16}
+                            size={20}
                             className="text-atheris-accent"
                           />
                         </div>
                       )}
-                      <div className="flex justify-between items-start mb-4">
+                      <div className="flex justify-between items-start mb-6">
                         <div className="flex flex-col">
-                          <h3 className="font-bold text-base flex-1 pr-10">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-black mono text-white/60">
+                              {index + 1}
+                            </div>
+                            <span className="text-[10px] mono font-bold opacity-80 uppercase text-[#00ff66] tracking-widest">
+                              {ex.muscleGroup}
+                            </span>
+                          </div>
+                          <h3 className="font-black text-xl flex-1 pr-12 leading-tight tracking-tight text-white/90">
                             {ex.name}
                           </h3>
-                          <span className="text-[10px] mono opacity-80 uppercase text-[#00ff66] tracking-tighter mt-1">
-                            MÚSCULO ALVO: {ex.muscleGroup}
-                          </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 relative z-10">
                           <button
                             onClick={() => setSelectedExercise(ex)}
-                            className="w-8 h-8 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center hover:bg-white/20 transition-colors"
+                            className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex-shrink-0 flex items-center justify-center hover:bg-white/20 transition-all shadow-md"
                           >
-                            <Info size={16} />
+                            <Info size={18} className="text-white/70" />
                           </button>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 mb-5">
-                        <div className="bg-atheris-text/5 rounded-lg p-2 text-center">
-                          <span className="mono opacity-50 block mb-1 font-bold text-[8px] uppercase tracking-widest">
-                            Séries
+                      
+                      <div className="flex gap-4 mb-6">
+                        <div className="flex-1 bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center border border-white/5">
+                          <span className="mono text-white/40 mb-1 font-black text-[9px] uppercase tracking-widest">
+                            Séries Meta
                           </span>
-                          <span className="font-bold text-atheris-text">
+                          <span className="text-2xl font-black text-white/90">
                             {ex.sets}
                           </span>
                         </div>
-                        <div className="bg-atheris-text/5 rounded-lg p-2 text-center">
-                          <span className="mono opacity-50 block mb-1 font-bold text-[8px] uppercase tracking-widest">
-                            Reps
+                        <div className="flex-1 bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center border border-white/5">
+                          <span className="mono text-white/40 mb-1 font-black text-[9px] uppercase tracking-widest">
+                            Reps Meta
                           </span>
-                          <span className="font-bold text-atheris-text">
+                          <span className="text-2xl font-black text-white/90">
                             {ex.reps}
                           </span>
                         </div>
-                        <div className="bg-atheris-text/5 rounded-lg p-2 text-center col-span-2 mt-2 mb-2 flex gap-2">
-                          <div className="flex-1 border border-white/5 relative group-hover:border-atheris-accent/30 transition-colors p-2 rounded-lg">
-                            <span className="mono opacity-50 block mb-1 font-bold text-[9px] uppercase tracking-[0.2em] text-atheris-accent">
-                              <TrendingUp size={10} className="inline mr-1" />{" "}
-                              Carga de Ataque (kg/lbs)
+                      </div>
+
+                      <div className="flex gap-3 mb-6">
+                          <div className="flex-[3] border border-white/10 relative focus-within:border-atheris-accent/50 transition-colors p-3 rounded-2xl bg-black/20">
+                            <span className="mono opacity-60 block mb-2 font-black text-[9px] uppercase tracking-[0.2em] text-atheris-accent">
+                              <TrendingUp size={10} className="inline mr-1" />
+                              Carga (kg)
                             </span>
-                            <input
-                              type="text"
-                              placeholder={ex.weight}
-                              value={weightsUsed[ex.id] || ""}
-                              onChange={(e) =>
-                                setWeightsUsed({
-                                  ...weightsUsed,
-                                  [ex.id]: e.target.value,
-                                })
-                              }
-                              className="w-full bg-transparent text-center font-black text-xl text-white focus:outline-none placeholder:text-white/20"
-                            />
+                            <div className="relative">
+                              <input
+                                type="text"
+                                placeholder={ex.weight}
+                                value={weightsUsed[ex.id] || ""}
+                                onChange={(e) =>
+                                  setWeightsUsed({
+                                    ...weightsUsed,
+                                    [ex.id]: e.target.value,
+                                  })
+                                }
+                                className="w-full bg-transparent font-black text-3xl text-white focus:outline-none placeholder:text-white/20"
+                              />
+                            </div>
                             {currentUser.exerciseWeights?.[ex.name] && (
-                              <div className="absolute right-2 top-2 p-1 px-2 rounded bg-atheris-accent/10 border border-atheris-accent/20 text-[7px] mono text-atheris-accent">
+                              <div className="absolute right-3 top-3 px-2 py-1 rounded bg-atheris-accent/10 border border-atheris-accent/20 text-[8px] mono font-bold text-atheris-accent uppercase tracking-widest">
                                 Última: {currentUser.exerciseWeights[ex.name]}
                               </div>
                             )}
                           </div>
 
-                          <div className="flex-1 border border-white/5 relative group-hover:border-atheris-accent/30 transition-colors p-2 rounded-lg">
-                            <span className="mono opacity-50 block mb-1 font-bold text-[9px] uppercase tracking-[0.2em] text-atheris-accent">
+                          <div className="flex-[2] border border-white/10 relative focus-within:border-white/40 transition-colors p-3 rounded-2xl bg-black/20">
+                            <span className="mono opacity-60 block mb-2 font-black text-[9px] uppercase tracking-[0.2em] text-white">
                               Reps Feitas
                             </span>
                             <input
@@ -1005,25 +1015,25 @@ export const ExecuteWorkoutModal = React.memo(
                                   [ex.id]: e.target.value.replace(/[^0-9]/g, ""),
                                 })
                               }
-                              className="w-full bg-transparent text-center font-black text-xl text-white focus:outline-none placeholder:text-white/20"
+                              className="w-full bg-transparent font-black text-3xl text-white focus:outline-none placeholder:text-white/20"
                             />
                           </div>
-                        </div>
                       </div>
 
                       {/* Recorded Sets Log for Normal Mode */}
                       {(setHistory[ex.id]?.length > 0) && (
-                        <div className="w-full flex flex-col gap-2 mb-6 px-1">
+                        <div className="w-full flex flex-col gap-2 mb-6">
+                           <h4 className="mono text-[9px] uppercase tracking-widest text-white/40 font-black mb-1 ml-1">Histórico de Séries</h4>
                           <AnimatePresence>
                             {setHistory[ex.id].map((record, idx) => (
                               <motion.div 
-                                initial={{ opacity: 0, height: 0, scale: 0.9 }}
+                                initial={{ opacity: 0, height: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, height: 'auto', scale: 1 }}
                                 exit={{ opacity: 0, height: 0 }}
                                 key={`hist-norm-${idx}`} 
-                                className="flex justify-between items-center text-xs p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/80"
+                                className="flex justify-between items-center text-xs p-3 rounded-xl bg-white/5 border border-white/[0.05] text-white/80"
                               >
-                                <span className="mono opacity-60 font-bold tracking-widest uppercase text-[9px]">Série {idx + 1}</span>
+                                <span className="mono opacity-80 font-black tracking-widest uppercase text-[10px] text-atheris-accent/80">Série {idx + 1}</span>
                                 <div className="flex gap-4 font-black">
                                   <span><span className="opacity-40 font-normal">Carga:</span> {record.weight || '-'} kg</span>
                                   <span><span className="opacity-40 font-normal">Reps:</span> {record.reps || '-'}</span>
@@ -1034,7 +1044,7 @@ export const ExecuteWorkoutModal = React.memo(
                         </div>
                       )}
 
-                      <div className="flex gap-3 justify-center flex-wrap px-2">
+                      <div className="flex gap-3 justify-center flex-wrap pt-2">
                         {Array.from({ length: ex.sets }).map((_, i) => {
                           const setsDoneEx = completedSets[ex.id] || 0;
                           const isCompletedEx = i < setsDoneEx;
@@ -1060,16 +1070,16 @@ export const ExecuteWorkoutModal = React.memo(
                                 }
                               }}
                               className={classNames(
-                                "w-12 h-12 rounded-full font-black text-lg flex items-center justify-center transition-all",
+                                "w-14 h-14 rounded-full font-black text-xl flex items-center justify-center transition-all",
                                 isCompletedEx
-                                  ? "bg-[#00ff66] text-black scale-95"
+                                  ? "bg-[#00ff66] text-black scale-95 shadow-inner"
                                   : isActiveSetEx
-                                    ? "border-2 border-[#00ff66] text-[#00ff66] shadow-[0_0_15px_rgba(0,255,102,0.4)]"
-                                    : "bg-white/5 opacity-50 text-white/30 cursor-not-allowed",
+                                    ? "border-2 border-[#00ff66] text-[#00ff66] shadow-[0_0_20px_rgba(0,255,102,0.3)] bg-[#00ff66]/5"
+                                    : "bg-white/5 border border-white/10 opacity-60 text-white/30 cursor-not-allowed",
                               )}
                             >
                               {isCompletedEx ? (
-                                <CheckCircle2 size={20} />
+                                <CheckCircle2 size={24} />
                               ) : (
                                 i + 1
                               )}
@@ -1079,21 +1089,23 @@ export const ExecuteWorkoutModal = React.memo(
                       </div>
                     </div>
                   ))}
-                  <button
-                    disabled={!allExercisesCompleted}
-                    onClick={handleFinish}
-                    className={classNames(
-                      "mt-8 w-full py-5 rounded-3xl font-black text-sm uppercase tracking-[0.3em] transition-all mb-8 flex items-center justify-center gap-3",
-                      allExercisesCompleted
-                        ? "accent-bg text-black shadow-[0_20px_50px_rgba(0,255,102,0.3)] hover:scale-[0.98]"
-                        : "bg-white/5 text-white/30 cursor-not-allowed",
-                    )}
-                  >
-                    <CheckCircle2 size={24} />{" "}
-                    {allExercisesCompleted
-                      ? "FINALIZAR PROTOCOLO"
-                      : "COMPLETE AS SÉRIES"}
-                  </button>
+                  <div className="px-4">
+                    <button
+                      disabled={!allExercisesCompleted}
+                      onClick={handleFinish}
+                      className={classNames(
+                        "mt-8 w-full py-6 rounded-[2rem] font-black text-sm uppercase tracking-[0.3em] transition-all mb-8 flex items-center justify-center gap-3",
+                        allExercisesCompleted
+                          ? "accent-bg text-black shadow-[0_20px_50px_rgba(0,255,102,0.3)] hover:scale-[0.98]"
+                          : "bg-white/5 border border-white/10 text-white/30 cursor-not-allowed",
+                      )}
+                    >
+                      <CheckCircle2 size={24} />{" "}
+                      {allExercisesCompleted
+                        ? "FINALIZAR PROTOCOLO"
+                        : "COMPLETE AS SÉRIES"}
+                    </button>
+                  </div>
                 </div>
               )}
             </>
@@ -1794,12 +1806,7 @@ export const StudentDetailModal = React.memo(
                 Evolução Metabólica
               </h2>
             </div>
-            <button
-              onClick={onAssignWorkout}
-              className="p-2 text-atheris-toxic hover:bg-white/5 rounded-full"
-            >
-              <Plus size={24} />
-            </button>
+            <div className="w-10"></div>
           </header>
 
           <div className="flex-1 overflow-y-auto p-6 pt-24 scrollbar-hide">

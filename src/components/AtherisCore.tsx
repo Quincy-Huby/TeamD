@@ -79,14 +79,6 @@ export const TabBar = React.memo(({ role, activeTab, setActiveTab }: {
             <SnakeEye size={activeTab === 'rank' ? 24 : 20} strokeWidth={activeTab === 'rank' ? 2.5 : 2} />
             <span className="text-[10px] mono font-bold uppercase tracking-widest">Rank</span>
           </button>
-
-          <button 
-            onClick={() => setActiveTab('perfil')}
-            className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'perfil' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
-          >
-            <UserIcon size={activeTab === 'perfil' ? 24 : 20} strokeWidth={activeTab === 'perfil' ? 2.5 : 2} />
-            <span className="text-[10px] mono font-bold uppercase tracking-widest">Perfil</span>
-          </button>
         </>
       )}
 
@@ -96,6 +88,14 @@ export const TabBar = React.memo(({ role, activeTab, setActiveTab }: {
       >
         <MessageSquare size={activeTab === 'chat' ? 24 : 20} strokeWidth={activeTab === 'chat' ? 2.5 : 2} />
         <span className="text-[10px] mono font-bold uppercase tracking-widest">Chat</span>
+      </button>
+
+      <button 
+        onClick={() => setActiveTab('perfil')}
+        className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'perfil' ? 'text-atheris-accent scale-110' : 'text-atheris-muted'}`}
+      >
+        <UserIcon size={activeTab === 'perfil' ? 24 : 20} strokeWidth={activeTab === 'perfil' ? 2.5 : 2} />
+        <span className="text-[10px] mono font-bold uppercase tracking-widest">Perfil</span>
       </button>
     </nav>
   );

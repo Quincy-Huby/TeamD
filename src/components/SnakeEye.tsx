@@ -70,9 +70,9 @@ export const SnakeEye: React.FC<SnakeEyeProps> = ({ size = 24, className = "", s
       />
       
       {/* Textura de Fibras Radiais (Viper Texture) */}
-      <g opacity="0.5">
+      <g opacity="0.3">
         {[...Array(20)].map((_, i) => (
-          <motion.line
+          <line
             key={i}
             x1="12"
             y1="13"
@@ -80,8 +80,6 @@ export const SnakeEye: React.FC<SnakeEyeProps> = ({ size = 24, className = "", s
             y2={13 + Math.sin(i * (Math.PI / 10)) * 5.5}
             stroke="currentColor"
             strokeWidth="0.3"
-            animate={{ opacity: [0.2, 0.6, 0.2] }}
-            transition={{ duration: 4 + i * 0.1, repeat: Infinity }}
           />
         ))}
       </g>

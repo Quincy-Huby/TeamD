@@ -17,8 +17,11 @@ service cloud.firestore {
     function isMaster() {
       return isSignedIn() && 
              request.auth.token != null &&
-             request.auth.token.get('email', '') != '' &&
-             (request.auth.token.get('email', '').matches('(?i)blackwoodstock1985@gmail.com') || request.auth.token.get('email', '').matches('(?i)lucasgab204lgr@gmail.com') || request.auth.token.get('email', '').matches('(?i)rafaelsr1990@gmail.com'));
+             request.auth.token.email != null &&
+             (request.auth.token.email == 'blackwoodstock1985@gmail.com' || 
+              request.auth.token.email == 'BlackWoodStock1985@gmail.com' || 
+              request.auth.token.email == 'lucasgab204lgr@gmail.com' || 
+              request.auth.token.email == 'rafaelsr1990@gmail.com');
     }
 
     // Verifica se o usuário é o dono do documento
@@ -73,6 +76,8 @@ service cloud.firestore {
       allow list: if true;
       
       allow create: if isSignedIn() && (isOwner(userId) || isMaster()) && isValidUser(incoming());
+      
+      allow delete: if isMaster();
       
       allow update: if isSignedIn() && (isOwner(userId) || isMaster()) &&
         incoming().role == existing().role &&

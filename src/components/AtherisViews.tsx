@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Home, Users, Dumbbell, Plus, CheckCircle2, ChevronLeft, Image as ImageIcon, Scale, TrendingUp, Search, Filter, Zap, Play, MessageSquare, Send, Frown, Meh, SmilePlus, Megaphone, Activity, AlertCircle, Shield, Droplet, Wind, Flame, Target, Sparkles, AlertTriangle, Home as HomeIcon, MapPin, Crown, Medal, Skull, Gem, LogOut } from 'lucide-react';
+import { Home, Users, Dumbbell, Plus, CheckCircle2, ChevronLeft, Image as ImageIcon, Scale, TrendingUp, Search, Filter, Zap, Play, MessageSquare, Send, Frown, Meh, SmilePlus, Megaphone, Activity, AlertCircle, Shield, Droplet, Wind, Flame, Target, Sparkles, AlertTriangle, Home as HomeIcon, MapPin, Crown, Medal, Skull, Gem, LogOut, UserPlus, Copy } from 'lucide-react';
 import { SnakeEye } from './SnakeEye';
 import { User, Workout, Message, Challenge } from '../types';
 import { EXERCISE_LIBRARY } from '../exerciseLibrary';
@@ -442,16 +442,20 @@ const InsigniaBadge = ({ rank, size = 24, showGlow = true }: { rank: any, size?:
   );
 };
 
-export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, weeklyGoal, onCheckIn, onExecuteQuickHit, onExecuteWorkout }: {
+export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, totalCompleted, weeklyGoal, onCheckIn, onExecuteQuickHit, onExecuteWorkout, onLogout }: {
   user: User,
   completedWorkouts: number,
   weeklyCompleted: number,
+  totalCompleted?: number,
   weeklyGoal: number,
   onCheckIn: () => void,
   onExecuteQuickHit: (title: string) => void,
-  onExecuteWorkout: (w: Workout) => void
+  onExecuteWorkout: (w: Workout) => void,
+  onLogout?: () => void
 }) => {
   const rank = getSnakeRank(user.points || 0);
+  const pointsToStreak = (pts: number) => pts === 0 ? 0 : Math.min(30, Math.floor(pts / 100) + 1);
+  const streak = Math.min(totalCompleted || 0, pointsToStreak(user.points || 0));
   const [quote, setQuote] = useState(predatorQuotes[0]);
   const [assignedWorkouts, setAssignedWorkouts] = useState<Workout[]>([]);
   const [nestStats, setNestStats] = useState({ total: 0, active: 0, alert: 0, dormant: 0 });
@@ -608,7 +612,7 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
           <div className="flex flex-col items-end">
              <div className="flex items-center gap-1 text-atheris-accent">
                 <Flame size={14} fill="currentColor" />
-                <span className="font-mono font-bold text-sm">3 DÍAS</span>
+                <span className="font-mono font-bold text-sm">{streak} {streak === 1 ? 'DÍA' : 'DÍAS'}</span>
              </div>
              <span className="text-[8px] mono uppercase opacity-30">Streak de Botes</span>
           </div>
@@ -784,6 +788,16 @@ export const HomeView = React.memo(({ user, completedWorkouts, weeklyCompleted, 
             <h4 className="font-bold text-lg mb-1">Ataque Direcionado</h4>
             <p className="text-sm italic px-4">Sua presença mantém a hierarquia. Inocule protocolos táticos no Ninho para manter a evolução.</p>
           </section>
+
+          {onLogout && (
+            <button
+               onClick={onLogout}
+               className="mt-4 p-4 rounded-2xl bg-red-500/10 text-red-500 font-black uppercase text-sm border border-red-500/20 hover:bg-red-500 hover:text-black transition-all flex items-center justify-center gap-2"
+            >
+               <LogOut size={18} />
+               Desconectar do Perfil Coach
+            </button>
+          )}
         </div>
       )}
     </motion.div>
@@ -899,6 +913,16 @@ export const AlunosView = React.memo(({ currentUser, onSelectStudent, onAssignWo
   const [loading, setLoading] = useState(true);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Em Caça' | 'Alerta' | 'Hibernando'>('Todos');
+  const [copied, setCopied] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleCopyInvite = () => {
+    const inviteUrl = `${window.location.origin}/?coachId=${currentUser.id}`;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -957,12 +981,21 @@ export const AlunosView = React.memo(({ currentUser, onSelectStudent, onAssignWo
           <h2 className="text-3xl font-black tracking-tighter uppercase mb-1">O Ninho</h2>
           <p className="text-atheris-muted text-[10px] mono uppercase tracking-widest px-1">Gerenciamento de Víboras</p>
         </div>
-        <button 
-          onClick={() => setShowBroadcast(true)}
-          className="p-3 bg-atheris-accent text-black rounded-2xl shadow-[0_0_20px_rgba(34,255,102,0.3)] active:scale-95 transition-all"
-        >
-          <Megaphone size={20} />
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleCopyInvite}
+            className="px-4 py-3 bg-white/5 border border-white/10 text-white rounded-2xl shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-white/10"
+          >
+            {copied ? <CheckCircle2 size={18} className="text-atheris-accent" /> : <UserPlus size={18} />}
+            <span className="hidden sm:inline text-xs font-bold uppercase tracking-widest">{copied ? 'Copiado!' : 'Convidar Aluno'}</span>
+          </button>
+          <button 
+            onClick={() => setShowBroadcast(true)}
+            className="p-3 bg-atheris-accent text-black rounded-2xl shadow-[0_0_20px_rgba(34,255,102,0.3)] active:scale-95 transition-all"
+          >
+            <Megaphone size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Admin Radar */}
@@ -1084,34 +1117,19 @@ export const AlunosView = React.memo(({ currentUser, onSelectStudent, onAssignWo
                         <p className="text-[10px] mono uppercase opacity-50 tracking-tighter">Tier: <span className="text-atheris-accent">{getSnakeRank(student.points || 0).name}</span> • {student.points} V-PTS</p>
                       </div>
                    </div>
-                   <div className="relative z-10 flex flex-row items-center gap-2">
-                      {status.label === 'Hibernando' && (
+                     <div className="relative z-10 flex flex-row items-center gap-2">
+                      {['blackwoodstock1985@gmail.com', 'lucasgab204lgr@gmail.com', 'rafaelsr1990@gmail.com'].includes(currentUser.email?.toLowerCase() || '') && (
                          <button 
-                           onClick={async (e) => { 
-                             e.stopPropagation(); 
-                             try {
-                               await addDoc(collection(db, 'messages'), {
-                                 senderId: currentUser.id,
-                                 senderName: currentUser.name,
-                                 receiverId: student.id,
-                                 type: 'text',
-                                 content: '⚠️ [PUSH NOTIFICATION]: Você está hibernando há muito tempo. É hora de caçar. Volte para o Ninho.',
-                                 createdAt: serverTimestamp()
-                               });
-                               alert(`Notificação Push enviada para o celular de ${student.name}! (Simulado)`);
-                             } catch (err) {
-                               console.error(err);
-                             }
-                           }} 
-                           className="p-2.5 bg-red-500/10 rounded-xl hover:bg-red-500 hover:text-white text-red-500 transition-all border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]" 
-                           title="Acordar Víbora (Push Notification)"
+                            onClick={(e) => {
+                               e.stopPropagation();
+                               setStudentToDelete(student);
+                            }}
+                            className="p-2.5 bg-red-900/40 rounded-xl hover:bg-red-600 hover:text-white text-red-400 transition-all border border-red-500/20"
+                            title="Deletar Conta"
                          >
-                           <Megaphone size={16} />
+                            <AlertTriangle size={16} />
                          </button>
                       )}
-                      <button onClick={(e) => { e.stopPropagation(); onAssignWorkout(student); }} className="p-2.5 bg-white/5 rounded-xl hover:bg-atheris-accent hover:text-black transition-all text-white/50 border border-white/5">
-                        <Zap size={16} />
-                      </button>
                    </div>
                 </motion.div>
               );
@@ -1131,6 +1149,58 @@ export const AlunosView = React.memo(({ currentUser, onSelectStudent, onAssignWo
 
       <AnimatePresence>
         {showBroadcast && <BroadcastModal onClose={() => setShowBroadcast(false)} students={students} coach={currentUser} />}
+        
+        {studentToDelete && (
+           <motion.div 
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+           >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="bg-atheris-bg border border-red-500/30 rounded-[2.5rem] p-6 max-w-sm w-full shadow-2xl shadow-red-500/10 text-center"
+              >
+                 <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20 text-red-500">
+                    <AlertTriangle size={32} strokeWidth={1.5} />
+                 </div>
+                 <h3 className="font-black text-xl mb-2 tracking-tight uppercase">Excluir Víbora?</h3>
+                 <p className="text-[11px] mono opacity-60 mb-6 px-4">
+                    Tem certeza que deseja apagar permanentemente o acesso de <strong className="text-atheris-text">{studentToDelete.name}</strong>? Essa ação é vitalícia e não pode ser desfeita.
+                 </p>
+                 <div className="flex gap-3">
+                    <button 
+                       onClick={() => setStudentToDelete(null)}
+                       disabled={isDeleting}
+                       className="flex-1 py-4 font-bold rounded-2xl bg-white/5 hover:bg-white/10 transition-all uppercase tracking-widest text-[10px]"
+                    >
+                       Cancelar
+                    </button>
+                    <button 
+                       onClick={async () => {
+                          setIsDeleting(true);
+                          try {
+                             const { deleteDoc, doc } = await import('firebase/firestore');
+                             await deleteDoc(doc(db, 'users', studentToDelete.id));
+                             setStudentToDelete(null);
+                          } catch(err: any) {
+                             console.error(err);
+                             alert('Erro ao excluir: ' + err.message);
+                          } finally {
+                             setIsDeleting(false);
+                          }
+                       }}
+                       disabled={isDeleting}
+                       className="flex-1 py-4 font-bold rounded-2xl bg-red-500 text-black hover:bg-red-400 transition-all uppercase tracking-widest text-[10px] shadow-[0_0_15px_rgba(239,68,68,0.4)] flex items-center justify-center"
+                    >
+                       {isDeleting ? 'Exterminando...' : 'Exterminar'}
+                    </button>
+                 </div>
+              </motion.div>
+           </motion.div>
+        )}
       </AnimatePresence>
     </motion.div>
   );
@@ -1227,7 +1297,7 @@ export const RankView = React.memo(({ currentUser, onSelectStudent }: { currentU
 
         <div className="grid grid-cols-3 gap-8 items-end relative z-10">
           {/* 2nd Place */}
-          {top3[1] && (
+          {top3[1] ? (
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="flex flex-col items-center gap-4 cursor-pointer hover:scale-105 transition-transform" onClick={() => onSelectStudent?.(top3[1])}>
               <div className="flex flex-col items-center">
                 <div className="relative">
@@ -1247,10 +1317,10 @@ export const RankView = React.memo(({ currentUser, onSelectStudent }: { currentU
                 </div>
               </div>
             </motion.div>
-          )}
+          ) : <div />}
 
           {/* 1st Place */}
-          {top3[0] && (
+          {top3[0] ? (
             <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-4 -mt-10 cursor-pointer hover:scale-105 transition-transform" onClick={() => onSelectStudent?.(top3[0])}>
               <div className="flex flex-col items-center relative">
                 {/* Halo Background */}
@@ -1280,10 +1350,10 @@ export const RankView = React.memo(({ currentUser, onSelectStudent }: { currentU
                 </div>
               </div>
             </motion.div>
-          )}
+          ) : <div />}
 
           {/* 3rd Place */}
-          {top3[2] && (
+          {top3[2] ? (
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="flex flex-col items-center gap-4 cursor-pointer hover:scale-105 transition-transform" onClick={() => onSelectStudent?.(top3[2])}>
               <div className="flex flex-col items-center">
                 <div className="relative">
@@ -1303,7 +1373,7 @@ export const RankView = React.memo(({ currentUser, onSelectStudent }: { currentU
                 </div>
               </div>
             </motion.div>
-          )}
+          ) : <div />}
         </div>
       </div>
 
@@ -1383,6 +1453,11 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [showUserCleaner, setShowUserCleaner] = useState(false);
+  const [fakeUsers, setFakeUsers] = useState<any[]>([]);
+  const [selectedFakeUsers, setSelectedFakeUsers] = useState<string[]>([]);
+  const [isCleaning, setIsCleaning] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -1699,6 +1774,108 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
          <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
          <span className="mono text-[11px] font-black uppercase tracking-[0.3em]">Desconectar</span>
       </button>
+
+      {/* MASTER ACTION */}
+      {['blackwoodstock1985@gmail.com', 'lucasgab204lgr@gmail.com', 'rafaelsr1990@gmail.com'].includes(currentUser.email?.toLowerCase() || '') && (
+        <div className="mt-4">
+           {showUserCleaner ? (
+              <div className="glass p-4 rounded-3xl border border-yellow-500/30">
+                 <div className="flex justify-between items-center mb-4">
+                    <h4 className="mono text-[10px] uppercase font-black tracking-widest text-yellow-500">Selecionar Perfis para Apagar</h4>
+                    <button onClick={() => setShowUserCleaner(false)} className="opacity-50 hover:opacity-100">
+                       <ChevronLeft size={16} />
+                    </button>
+                 </div>
+                 
+                 {isCleaning ? (
+                    <div className="text-center py-4 text-xs font-mono uppercase opacity-50">Carregando...</div>
+                 ) : (
+                    <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
+                       {fakeUsers.length === 0 ? (
+                          <div className="text-center py-4 text-xs font-mono uppercase opacity-50">Nenhuma outra conta encontrada.</div>
+                       ) : (
+                          fakeUsers.map(fu => (
+                             <div key={fu.id} className="flex items-center gap-3 p-3 bg-black/20 rounded-xl border border-white/5">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedFakeUsers.includes(fu.id)}
+                                  onChange={(e) => {
+                                     if (e.target.checked) setSelectedFakeUsers(prev => [...prev, fu.id]);
+                                     else setSelectedFakeUsers(prev => prev.filter(id => id !== fu.id));
+                                  }}
+                                  className="w-4 h-4 rounded border-white/20 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-0 bg-black/50"
+                                />
+                                <div className="flex flex-col flex-1 overflow-hidden">
+                                   <span className="font-bold text-sm truncate">{fu.name}</span>
+                                   <span className="mono text-[9px] opacity-50 truncate">{fu.email}</span>
+                                </div>
+                             </div>
+                          ))
+                       )}
+                    </div>
+                 )}
+                 
+                 {fakeUsers.length > 0 && !isCleaning && (
+                    <button 
+                       disabled={selectedFakeUsers.length === 0}
+                       onClick={async () => {
+                          setIsCleaning(true);
+                          try {
+                             const { deleteDoc } = await import('firebase/firestore');
+                             for (const id of selectedFakeUsers) {
+                                await deleteDoc(doc(db, 'users', id));
+                             }
+                             setFakeUsers(prev => prev.filter(u => !selectedFakeUsers.includes(u.id)));
+                             setSelectedFakeUsers([]);
+                             // Note: No alert needed, the UI state naturally reflects success
+                          } catch(err: any) {
+                             console.error('Erro ao apagar: ' + err.message);
+                          } finally {
+                             setIsCleaning(false);
+                          }
+                       }}
+                       className={classNames(
+                          "w-full mt-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs transition-all",
+                          selectedFakeUsers.length > 0 
+                             ? "bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.3)]" 
+                             : "bg-white/5 text-white/30 cursor-not-allowed"
+                       )}
+                    >
+                       {selectedFakeUsers.length > 0 ? `Apagar ${selectedFakeUsers.length} Conta(s)` : 'Nenhuma Selecionada'}
+                    </button>
+                 )}
+              </div>
+           ) : (
+              <button 
+                 onClick={async () => {
+                    setShowUserCleaner(true);
+                    setIsCleaning(true);
+                    try {
+                       const q = query(collection(db, 'users'));
+                       const snaps = await getDocs(q);
+                       const allowed = ['blackwoodstock1985@gmail.com', 'lucasgab204lgr@gmail.com', 'rafaelsr1990@gmail.com'];
+                       const usersToClean: any[] = [];
+                       snaps.forEach(docSnap => {
+                          const data = docSnap.data();
+                          if (!data.email || !allowed.includes(data.email.toLowerCase())) {
+                             usersToClean.push({ id: docSnap.id, ...data });
+                          }
+                       });
+                       setFakeUsers(usersToClean);
+                    } catch(err: any) {
+                       console.error('Erro ao buscar contas: ' + err.message);
+                    } finally {
+                       setIsCleaning(false);
+                    }
+                 }}
+                 className="w-full flex items-center justify-center gap-4 py-5 rounded-[2.5rem] border border-yellow-500/30 bg-yellow-500/5 text-yellow-500 hover:bg-yellow-500 hover:text-black transition-all duration-300 group shadow-lg shadow-yellow-500/5 active:scale-95"
+              >
+                 <AlertTriangle size={20} className="group-hover:animate-pulse" />
+                 <span className="mono text-[11px] font-black uppercase tracking-[0.3em]">Limpar Fakes</span>
+              </button>
+           )}
+        </div>
+      )}
 
     </motion.div>
   );
