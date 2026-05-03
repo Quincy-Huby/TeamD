@@ -501,12 +501,20 @@ export default function App() {
          if (change.type === 'added') {
             const msg = change.doc.data();
             if (msg.senderId !== currentUser.id) {
+               // Vibrate for incoming message (200ms)
+               if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                  navigator.vibrate([200, 100, 200]);
+               }
+
                if ("Notification" in window && Notification.permission === "granted") {
                   new Notification(`Atheris: Mensagem de ${msg.senderName}`, {
                      body: msg.type === 'image' ? '📸 Imagem Mapeada' : msg.content,
                      icon: '/favicon.ico'
                   });
                }
+               
+               // In-app visual notification
+               addNotification('Comunicação Recebida', `Mensagem de ${msg.senderName}.`, 'info');
             }
          }
       });
@@ -515,7 +523,7 @@ export default function App() {
     });
 
     return () => unsub();
-  }, [currentUser]);
+  }, [currentUser, addNotification]);
 
   // Early return must happen after all hooks
   if (!isFirebaseConfigured) {

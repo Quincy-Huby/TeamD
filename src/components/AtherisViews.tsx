@@ -96,6 +96,9 @@ export const AdminChatView = React.memo(({ currentUser, onExecuteWorkout }: { cu
         type: 'text',
         createdAt: serverTimestamp()
       });
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+         navigator.vibrate([50]); // Short vibration for sent message
+      }
       setReply('');
     } catch (err) {
       console.error(err);
@@ -167,6 +170,9 @@ export const AdminChatView = React.memo(({ currentUser, onExecuteWorkout }: { cu
         },
         createdAt: serverTimestamp()
       });
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+         navigator.vibrate([50]);
+      }
       
     } catch (err) {
       console.error(err);
