@@ -499,22 +499,30 @@ export default function App() {
 
       snapshot.docChanges().forEach(change => {
          if (change.type === 'added') {
-            const msg = change.doc.data();
-            if (msg.senderId !== currentUser.id) {
+            const msg = change.doc.data({ serverTimestamps: 'estimate' });
+            
+            // Only notify for messages sent in the last 30 seconds
+            // This prevents a flood of notifications when the app wakes up from background
+            const isRecent = msg.createdAt ? (Date.now() - msg.createdAt.toMillis()) < 30000 : true;
+
+            if (msg.senderId !== currentUser.id && isRecent) {
                // Vibrate for incoming message (200ms)
                if (typeof navigator !== 'undefined' && navigator.vibrate) {
                   navigator.vibrate([200, 100, 200]);
                }
 
-               if ("Notification" in window && Notification.permission === "granted") {
-                  new Notification(`Atheris: Mensagem de ${msg.senderName}`, {
-                     body: msg.type === 'image' ? '📸 Imagem Mapeada' : msg.content,
-                     icon: '/favicon.ico'
-                  });
+               if (document.visibilityState === 'visible') {
+                  // In-app visual notification when app is open
+                  addNotification('Comunicação Recebida', `Mensagem de ${msg.senderName}.`, 'info');
+               } else {
+                  // System notification when app is in background
+                  if ("Notification" in window && Notification.permission === "granted") {
+                     new Notification(`Atheris: Mensagem de ${msg.senderName}`, {
+                        body: msg.type === 'image' ? '📸 Imagem Mapeada' : msg.content,
+                        icon: '/favicon.ico'
+                     });
+                  }
                }
-               
-               // In-app visual notification
-               addNotification('Comunicação Recebida', `Mensagem de ${msg.senderName}.`, 'info');
             }
          }
       });
