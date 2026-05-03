@@ -5,7 +5,7 @@ import { SnakeEye } from './components/SnakeEye';
 import { User, Workout, Role } from './types';
 import { auth, db, logout, isFirebaseConfigured } from './firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, addDoc, onSnapshot } from 'firebase/firestore';
 import { classNames } from './lib/utils';
 import { BackgroundBlobs, Header, TabBar } from './components/AtherisCore';
 import { HomeView, TreinosView, AlunosView, RankView, AdminChatView, ProfileView } from './components/AtherisViews';
@@ -470,6 +470,52 @@ export default function App() {
     });
     return () => unsub();
   }, [loadUserStats]);
+
+  // --- NOTIFICATIONS EFFECT ---
+  useEffect(() => {
+    if (!currentUser) return;
+
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    let receiverIds = [currentUser.id];
+    if (currentUser.role === 'coach') {
+       receiverIds.push('coach_daniel');
+    }
+
+    const q = query(
+      collection(db, 'messages'),
+      where('receiverId', 'in', receiverIds)
+    );
+
+    let isInitialSetup = true;
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      if (isInitialSetup) {
+         isInitialSetup = false;
+         return;
+      }
+
+      snapshot.docChanges().forEach(change => {
+         if (change.type === 'added') {
+            const msg = change.doc.data();
+            if (msg.senderId !== currentUser.id) {
+               if ("Notification" in window && Notification.permission === "granted") {
+                  new Notification(`Atheris: Mensagem de ${msg.senderName}`, {
+                     body: msg.type === 'image' ? '📸 Imagem Mapeada' : msg.content,
+                     icon: '/favicon.ico'
+                  });
+               }
+            }
+         }
+      });
+    }, (error) => {
+       console.error("Notifications listener error:", error);
+    });
+
+    return () => unsub();
+  }, [currentUser]);
 
   // Early return must happen after all hooks
   if (!isFirebaseConfigured) {

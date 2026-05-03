@@ -1453,11 +1453,6 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const [showUserCleaner, setShowUserCleaner] = useState(false);
-  const [fakeUsers, setFakeUsers] = useState<any[]>([]);
-  const [selectedFakeUsers, setSelectedFakeUsers] = useState<string[]>([]);
-  const [isCleaning, setIsCleaning] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -1774,108 +1769,6 @@ export const ProfileView = React.memo(({ currentUser, onLogout, onUpdateUser }: 
          <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
          <span className="mono text-[11px] font-black uppercase tracking-[0.3em]">Desconectar</span>
       </button>
-
-      {/* MASTER ACTION */}
-      {['blackwoodstock1985@gmail.com', 'lucasgab204lgr@gmail.com', 'rafaelsr1990@gmail.com'].includes(currentUser.email?.toLowerCase() || '') && (
-        <div className="mt-4">
-           {showUserCleaner ? (
-              <div className="glass p-4 rounded-3xl border border-yellow-500/30">
-                 <div className="flex justify-between items-center mb-4">
-                    <h4 className="mono text-[10px] uppercase font-black tracking-widest text-yellow-500">Selecionar Perfis para Apagar</h4>
-                    <button onClick={() => setShowUserCleaner(false)} className="opacity-50 hover:opacity-100">
-                       <ChevronLeft size={16} />
-                    </button>
-                 </div>
-                 
-                 {isCleaning ? (
-                    <div className="text-center py-4 text-xs font-mono uppercase opacity-50">Carregando...</div>
-                 ) : (
-                    <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
-                       {fakeUsers.length === 0 ? (
-                          <div className="text-center py-4 text-xs font-mono uppercase opacity-50">Nenhuma outra conta encontrada.</div>
-                       ) : (
-                          fakeUsers.map(fu => (
-                             <div key={fu.id} className="flex items-center gap-3 p-3 bg-black/20 rounded-xl border border-white/5">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedFakeUsers.includes(fu.id)}
-                                  onChange={(e) => {
-                                     if (e.target.checked) setSelectedFakeUsers(prev => [...prev, fu.id]);
-                                     else setSelectedFakeUsers(prev => prev.filter(id => id !== fu.id));
-                                  }}
-                                  className="w-4 h-4 rounded border-white/20 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-0 bg-black/50"
-                                />
-                                <div className="flex flex-col flex-1 overflow-hidden">
-                                   <span className="font-bold text-sm truncate">{fu.name}</span>
-                                   <span className="mono text-[9px] opacity-50 truncate">{fu.email}</span>
-                                </div>
-                             </div>
-                          ))
-                       )}
-                    </div>
-                 )}
-                 
-                 {fakeUsers.length > 0 && !isCleaning && (
-                    <button 
-                       disabled={selectedFakeUsers.length === 0}
-                       onClick={async () => {
-                          setIsCleaning(true);
-                          try {
-                             const { deleteDoc } = await import('firebase/firestore');
-                             for (const id of selectedFakeUsers) {
-                                await deleteDoc(doc(db, 'users', id));
-                             }
-                             setFakeUsers(prev => prev.filter(u => !selectedFakeUsers.includes(u.id)));
-                             setSelectedFakeUsers([]);
-                             // Note: No alert needed, the UI state naturally reflects success
-                          } catch(err: any) {
-                             console.error('Erro ao apagar: ' + err.message);
-                          } finally {
-                             setIsCleaning(false);
-                          }
-                       }}
-                       className={classNames(
-                          "w-full mt-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs transition-all",
-                          selectedFakeUsers.length > 0 
-                             ? "bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.3)]" 
-                             : "bg-white/5 text-white/30 cursor-not-allowed"
-                       )}
-                    >
-                       {selectedFakeUsers.length > 0 ? `Apagar ${selectedFakeUsers.length} Conta(s)` : 'Nenhuma Selecionada'}
-                    </button>
-                 )}
-              </div>
-           ) : (
-              <button 
-                 onClick={async () => {
-                    setShowUserCleaner(true);
-                    setIsCleaning(true);
-                    try {
-                       const q = query(collection(db, 'users'));
-                       const snaps = await getDocs(q);
-                       const allowed = ['blackwoodstock1985@gmail.com', 'lucasgab204lgr@gmail.com', 'rafaelsr1990@gmail.com'];
-                       const usersToClean: any[] = [];
-                       snaps.forEach(docSnap => {
-                          const data = docSnap.data();
-                          if (!data.email || !allowed.includes(data.email.toLowerCase())) {
-                             usersToClean.push({ id: docSnap.id, ...data });
-                          }
-                       });
-                       setFakeUsers(usersToClean);
-                    } catch(err: any) {
-                       console.error('Erro ao buscar contas: ' + err.message);
-                    } finally {
-                       setIsCleaning(false);
-                    }
-                 }}
-                 className="w-full flex items-center justify-center gap-4 py-5 rounded-[2.5rem] border border-yellow-500/30 bg-yellow-500/5 text-yellow-500 hover:bg-yellow-500 hover:text-black transition-all duration-300 group shadow-lg shadow-yellow-500/5 active:scale-95"
-              >
-                 <AlertTriangle size={20} className="group-hover:animate-pulse" />
-                 <span className="mono text-[11px] font-black uppercase tracking-[0.3em]">Limpar Fakes</span>
-              </button>
-           )}
-        </div>
-      )}
 
     </motion.div>
   );
